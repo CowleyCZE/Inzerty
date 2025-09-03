@@ -1,6 +1,6 @@
 import React from 'react';
 
-const AdCard = ({ ad }) => (
+const AdCard: React.FC<{ ad: any }> = ({ ad }) => (
   <div className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col">
     <img 
         src={ad.image_url} 
