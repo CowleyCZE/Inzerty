@@ -4,19 +4,10 @@ import { GoogleGenAI } from "@google/genai";
 import { AdType } from '../types';
 import { GEMINI_MODEL_TEXT } from '../constants.ts'; // Updated extension
 
-let apiKeyFromEnv;
-try {
-  if (typeof process !== 'undefined' && process.env && typeof process.env.API_KEY === 'string') {
-    apiKeyFromEnv = process.env.API_KEY;
-  }
-} catch (e) {
-  console.warn("Chyba při přístupu k process.env.API_KEY v geminiService.ts:", e);
-}
-
-const API_KEY = apiKeyFromEnv;
+const API_KEY = import.meta.env.VITE_API_KEY;
 
 if (!API_KEY) {
-  console.error("API klíč pro Gemini není nastaven (process.env.API_KEY nebyl nalezen nebo je neplatný). Služba Gemini nebude funkční.");
+  console.error("API klíč pro Gemini není nastaven. Vytvořte soubor .env.local a vložte do něj VITE_API_KEY='váš_klíč'. Služba Gemini nebude funkční.");
 }
 
 const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
