@@ -179,7 +179,7 @@ const App = () => {
     setIsScraping(false);
     const endTime = performance.now();
     setLastScrapeDuration((endTime - startTime) / 1000);
-  }, [config, addLog, advanceWorkflow, parsePrice]);
+  }, [config, addLog, advanceWorkflow]); // Odebrání parsePrice, protože je definováno mimo komponentu
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100">
@@ -236,7 +236,7 @@ const DetailModal: React.FC<{
           <p className="text-slate-300"><strong>Popis:</strong> {match.offer.description}</p>
           <p className="text-slate-300"><strong>Datum:</strong> {match.offer.date_posted}</p>
           <p className="text-slate-300"><strong>Lokalita:</strong> {match.offer.location}</p>
-          <a href={match.offer.url} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Zobrazit inzerát</a>
+          <a href={match.offer.link} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Zobrazit inzerát</a>
         </div>
 
         <div>
@@ -247,7 +247,7 @@ const DetailModal: React.FC<{
           <p className="text-slate-300"><strong>Popis:</strong> {match.demand.description}</p>
           <p className="text-slate-300"><strong>Datum:</strong> {match.demand.date_posted}</p>
           <p className="text-slate-300"><strong>Lokalita:</strong> {match.demand.location}</p>
-          <a href={match.demand.url} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Zobrazit inzerát</a>
+          <a href={match.demand.link} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Zobrazit inzerát</a>
         </div>
       </div>
     </div>
