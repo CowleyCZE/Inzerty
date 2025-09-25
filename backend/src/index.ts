@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import *'fs/promises';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto'; // Import pro generování UUID
