@@ -2,9 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import * as fs from 'fs/promises';
+import *'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto'; // Import pro generování UUID
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,6 +74,9 @@ app.post('/scrape', async (req, res) => {
                 }
             });
             const $ = cheerio.load(response.data);
+            const urlObject = new URL(currentPageUrl);
+            const baseUrl = urlObject.origin;
+
 
             const items = $(selectors.item);
             if (items.length === 0) {
@@ -90,16 +94,18 @@ app.post('/scrape', async (req, res) => {
                     shouldStop = true;
                     break;
                 }
-
+                const link = $(element).find(selectors.link).attr('href');
                 const ad = {
-                    id: crypto.randomUUID(),
+                    id: randomUUID(), // Použití importovaného randomUUID
                     title: $(element).find(selectors.title).text().trim(),
                     price: $(element).find(selectors.price).text().trim(),
-                    link: $(element).find(selectors.link).attr('href'),
+                    link: link && !link.startsWith('http') ? `${baseUrl}${link}` : link, // Doplnění URL
                     date_posted: adDateStr,
                     brand: brand,
                     ad_type: adType,
                     scraped_at: new Date().toISOString(),
+                    description: $(element).find(selectors.description).text().trim(), // Přidáno description
+                    location: $(element).find(selectors.location).text().trim(), // Přidáno location
                 };
                 scrapedAds.push(ad);
 
@@ -116,8 +122,7 @@ app.post('/scrape', async (req, res) => {
 
             const nextPageLink = $('a:contains("Další")').attr('href');
             if (nextPageLink) {
-                const urlObject = new URL(currentPageUrl);
-                currentPageUrl = new URL(nextPageLink, urlObject.origin).href;
+                currentPageUrl = new URL(nextPageLink, baseUrl).href;
             } else {
                 hasNextPage = false;
                 console.log('No next page link found. Stopping.');
