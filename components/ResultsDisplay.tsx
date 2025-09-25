@@ -1,6 +1,7 @@
 import React from 'react';
+import { Ad } from '../types'; // Assuming Ad type is imported
 
-const AdCard: React.FC<{ ad: any }> = ({ ad }) => (
+const AdCard: React.FC<{ ad: Ad }> = ({ ad }) => (
   <div className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col">
     <img 
         src={ad.image_url} 
@@ -34,8 +35,28 @@ const AdCard: React.FC<{ ad: any }> = ({ ad }) => (
   </div>
 );
 
+const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad, demand: Ad }, onClick: (offer: Ad, demand: Ad) => void }> = ({ matchedAd, onClick }) => (
+  <div
+    className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col cursor-pointer"
+    onClick={() => onClick(matchedAd.offer, matchedAd.demand)}
+  >
+    <div className="p-5 flex flex-col flex-grow">
+      <h3 className="text-lg font-semibold text-sky-400 mb-2 truncate">Shoda pro {matchedAd.offer.brand}</h3>
+      <p className="text-sm text-slate-300 mb-1">
+        <span className="font-bold">Nabídka:</span> {matchedAd.offer.title} ({matchedAd.offer.price})
+      </p>
+      <p className="text-sm text-slate-300 mb-4">
+        <span className="font-bold">Poptávka:</span> {matchedAd.demand.title} ({matchedAd.demand.price})
+      </p>
+      <div className="mt-auto flex justify-between items-center text-xs text-slate-400">
+        <span>Rozdíl: {parseFloat(matchedAd.demand.price.replace(/[^0-9,-]+/g, '').replace(',', '.')) - parseFloat(matchedAd.offer.price.replace(/[^0-9,-]+/g, '').replace(',', '.'))} Kč</span>
+      </div>
+    </div>
+  </div>
+);
 
-const ResultsDisplay = ({ ads, isLoading }) => {
+
+const ResultsDisplay = ({ matchedAds, isLoading, onMatchClick }) => {
   if (isLoading) {
     return (
       <div className="mt-8 text-center p-10">
@@ -45,11 +66,11 @@ const ResultsDisplay = ({ ads, isLoading }) => {
     );
   }
 
-  if (ads.length === 0) {
+  if (matchedAds.length === 0) {
     return (
       <div className="mt-8 p-6 bg-slate-800 rounded-lg shadow-inner text-center">
         <InfoIcon />
-        <p className="text-slate-400 text-lg mt-2">Nebyly nalezeny žádné inzeráty. Nakonfigurujte a spusťte scrapování.</p>
+        <p className="text-slate-400 text-lg mt-2">Nebyly nalezeny žádné shody. Zkuste upravit konfiguraci.</p>
       </div>
     );
   }
@@ -60,11 +81,11 @@ const ResultsDisplay = ({ ads, isLoading }) => {
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="hero-icon w-6 h-6 mr-2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
         </svg>
-        Výsledky Scrapování ({ads.length})
+        Nalezené Shody ({matchedAds.length})
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {ads.map(ad => (
-          <AdCard key={ad.id} ad={ad} />
+        {matchedAds.map((match, index) => (
+          <MatchedAdCard key={index} matchedAd={match} onClick={onMatchClick} />
         ))}
       </div>
     </div>

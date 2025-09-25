@@ -47,7 +47,7 @@ export const generateMockAds = async (brand, adType, count) => {
         views: `${Math.floor(Math.random() * 200)}x`,
         is_top: Math.random() < 0.2,
       }));
-    alert(`Gemini AI není inicializováno kvůli chybějícímu nebo neplatnému API klíči (process.env.API_KEY). Zobrazují se nouzová data.`);
+    alert(`Gemini AI není inicializováno. Ujistěte se, že máte správně nastavený API klíč v souboru .env.local a že jste restartovali server. Zobrazují se nouzová data.`);
     return Promise.resolve(fallbackAds); 
   }
 

@@ -1,18 +1,41 @@
 import React from 'react';
-import { BRANDS, AD_TYPE_OPTIONS, ITEM_COUNT_OPTIONS } from '../constants.tsx'; // Updated extension
-import { AdType } from '../types';
+import { BRANDS, AD_TYPE_OPTIONS, ITEM_COUNT_OPTIONS } from '../constants.tsx';
+import { Config } from '../types';
 
-const ConfigurationPanel = ({ config, setConfig, onStartScraping, isScraping, apiKeyAvailable }) => {
-  const handleBrandChange = (e) => {
+interface ConfigurationPanelProps {
+  config: Config;
+  setConfig: React.Dispatch<React.SetStateAction<Config>>;
+  onStartScraping: () => void;
+  isScraping: boolean;
+  apiKeyAvailable: boolean;
+}
+
+const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ config, setConfig, onStartScraping, isScraping, apiKeyAvailable }) => {
+  const handleBrandChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setConfig(prev => ({ ...prev, brand: e.target.value }));
   };
 
-  const handleAdTypeChange = (e) => {
+  const handleAdTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setConfig(prev => ({ ...prev, adType: e.target.value }));
   };
   
-  const handleItemCountChange = (e) => {
+  const handleItemCountChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setConfig(prev => ({ ...prev, itemCount: parseInt(e.target.value, 10) }));
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setConfig(prev => ({ ...prev, url: e.target.value }));
+  };
+
+  const handleSelectorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setConfig(prev => ({
+      ...prev,
+      selectors: {
+        ...prev.selectors,
+        [name]: value,
+      }
+    }));
   };
 
   return (
@@ -26,7 +49,7 @@ const ConfigurationPanel = ({ config, setConfig, onStartScraping, isScraping, ap
       
       {!apiKeyAvailable && (
         <div className="mb-4 p-4 bg-red-800 border border-red-700 text-red-200 rounded-md">
-          <strong className="font-semibold">Chyba konfigurace:</strong> API klíč pro Gemini (<code>process.env.API_KEY</code>) není dostupný. Generování dat nebude fungovat. Zkontrolujte konzoli prohlížeče pro více detailů.
+          <strong className="font-semibold">Chyba konfigurace:</strong> API klíč pro Gemini není dostupný. Zkontrolujte, že je správně nastaven v <code>.env.local</code> souboru a restartovali jste server.
         </div>
       )}
 
@@ -80,6 +103,46 @@ const ConfigurationPanel = ({ config, setConfig, onStartScraping, isScraping, ap
               <option key={count} value={count}>{count}</option>
             ))}
           </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
+        <div>
+          <label htmlFor="url" className="block text-sm font-medium text-slate-300 mb-1">
+            Cílová URL
+          </label>
+          <input
+            type="text"
+            id="url"
+            value={config.url}
+            onChange={handleUrlChange}
+            disabled={isScraping}
+            className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 p-3 text-sm"
+          />
+        </div>
+      </div>
+
+      <h3 className="text-lg font-semibold text-sky-400 mb-4 mt-6">CSS Selektory</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div>
+          <label htmlFor="item" className="block text-sm font-medium text-slate-300 mb-1">Položka inzerátu</label>
+          <input type="text" id="item" name="item" value={config.selectors.item} onChange={handleSelectorChange} disabled={isScraping} className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg p-2 text-sm" />
+        </div>
+        <div>
+          <label htmlFor="title" className="block text-sm font-medium text-slate-300 mb-1">Název</label>
+          <input type="text" id="title" name="title" value={config.selectors.title} onChange={handleSelectorChange} disabled={isScraping} className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg p-2 text-sm" />
+        </div>
+        <div>
+          <label htmlFor="price" className="block text-sm font-medium text-slate-300 mb-1">Cena</label>
+          <input type="text" id="price" name="price" value={config.selectors.price} onChange={handleSelectorChange} disabled={isScraping} className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg p-2 text-sm" />
+        </div>
+        <div>
+          <label htmlFor="date" className="block text-sm font-medium text-slate-300 mb-1">Datum</label>
+          <input type="text" id="date" name="date" value={config.selectors.date} onChange={handleSelectorChange} disabled={isScraping} className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg p-2 text-sm" />
+        </div>
+        <div>
+          <label htmlFor="link" className="block text-sm font-medium text-slate-300 mb-1">Odkaz</label>
+          <input type="text" id="link" name="link" value={config.selectors.link} onChange={handleSelectorChange} disabled={isScraping} className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg p-2 text-sm" />
         </div>
       </div>
 

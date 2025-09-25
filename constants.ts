@@ -1,9 +1,7 @@
-
-
 import { AdType } from './types';
 
 export const BRANDS = [
-  'Samsung', 'Apple', 'HTC', 'Huawei', 'LG', 'Motorola', 'Nokia', 'Sony', 'Xiaomi', 'Google Pixel', 'OnePlus', 'Ostatní'
+  'Samsung', 'Apple', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi'
 ];
 
 export const AD_TYPE_OPTIONS = [
@@ -29,3 +27,17 @@ export const ETHICAL_GUIDELINES = {
 };
 
 export const INITIAL_LOG_MESSAGE = "Systém připraven. Nakonfigurujte a spusťte scrapování.";
+
+export const DEFAULT_CONFIG = {
+  brand: BRANDS[0],
+  adType: AD_TYPE_OPTIONS[0].value,
+  itemCount: ITEM_COUNT_OPTIONS[0],
+  url: 'https://www.bazos.cz/mobily/',
+  selectors: {
+    item: '.inzeraty.inzeratyflex',
+    title: '.nadpis',
+    price: '.inzeratycena',
+    date: '.velikost10',
+    link: '.nadpis a',
+  }
+};

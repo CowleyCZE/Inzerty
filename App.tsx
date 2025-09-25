@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import WorkflowSidebar from './components/WorkflowSidebar';
@@ -6,135 +5,181 @@ import ConfigurationPanel from './components/ConfigurationPanel';
 import ResultsDisplay from './components/ResultsDisplay';
 import LogPanel from './components/LogPanel';
 import MonitoringDashboard from './components/MonitoringDashboard';
-import { AdType, WorkflowStepValue } from './types';
-import { generateMockAds } from './services/geminiService';
-import { BRANDS, AD_TYPE_OPTIONS, ITEM_COUNT_OPTIONS, INITIAL_LOG_MESSAGE } from './constants.tsx'; // Updated extension
+import { Ad, Config, WorkflowStepValue, AdType } from './types';
+import { DEFAULT_CONFIG, INITIAL_LOG_MESSAGE, BRANDS, AD_TYPE_OPTIONS } from './constants.tsx';
+
+// Move parsePrice outside the App component
+const parsePrice = (priceString: string): number | null => {
+  if (!priceString) return null;
+  const cleanedPrice = priceString.replace(/[^0-9,-]+/g, '').replace(',', '.');
+  const price = parseFloat(cleanedPrice);
+  return isNaN(price) ? null : price;
+};
 
 const App = () => {
-  const [config, setConfig] = useState({
-    brand: BRANDS[0],
-    adType: AD_TYPE_OPTIONS[0].value,
-    itemCount: ITEM_COUNT_OPTIONS[0],
-  });
-  const [ads, setAds] = useState([]);
+  const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
+  const [ads, setAds] = useState<Ad[]>([]);
+  const [matchedAds, setMatchedAds] = useState<{ offer: Ad, demand: Ad }[]>([]);
   const [isScraping, setIsScraping] = useState(false);
-  const [currentWorkflowStep, setCurrentWorkflowStep] = useState(WorkflowStepValue.IDLE);
-  const [completedSteps, setCompletedSteps] = useState(new Set());
-  const [logs, setLogs] = useState([{ 
-    id: crypto.randomUUID(), 
-    timestamp: new Date().toLocaleTimeString('cs-CZ'), 
+  const [currentWorkflowStep, setCurrentWorkflowStep] = useState<WorkflowStepValue>(WorkflowStepValue.IDLE);
+  const [completedSteps, setCompletedSteps] = useState(new Set<WorkflowStepValue>());
+  const [logs, setLogs] = useState([{
+    id: crypto.randomUUID(),
+    timestamp: new Date().toLocaleTimeString('cs-CZ'),
     message: INITIAL_LOG_MESSAGE,
     type: 'system'
   }]);
-  const [lastScrapeDuration, setLastScrapeDuration] = useState(null);
-  const [apiKeyAvailable, setApiKeyAvailable] = useState(true); // Assume available initially
+  const [lastScrapeDuration, setLastScrapeDuration] = useState<number | null>(null);
+  const [apiKeyAvailable, setApiKeyAvailable] = useState(true); // Placeholder, will be replaced by backend check
 
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<{ offer: Ad, demand: Ad } | null>(null);
 
-  const addLog = useCallback((message, type = 'info') => {
+  const addLog = useCallback((message: string, type = 'info') => {
     setLogs(prevLogs => [
       ...prevLogs,
-      { 
-        id: crypto.randomUUID(), 
-        timestamp: new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
+      {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         message,
-        type 
+        type
       }
     ]);
   }, []);
 
+  const handleMatchClick = useCallback((offer: Ad, demand: Ad) => {
+    setSelectedMatch({ offer, demand });
+    setShowDetailModal(true);
+  }, []);
+
   useEffect(() => {
-    let keyAvailable = false;
-    try {
-      if (typeof process !== 'undefined' && process.env && typeof process.env.API_KEY === 'string' && process.env.API_KEY.length > 0) {
-        keyAvailable = true;
-      }
-    } catch (e) {
-      console.warn("Chyba při přístupu k process.env.API_KEY v App.tsx:", e);
-    }
-
-    if (!keyAvailable) {
-        setApiKeyAvailable(false);
-        addLog("API klíč pro Gemini (process.env.API_KEY) není dostupný nebo je neplatný. Generování dat nebude fungovat. Zajistěte, aby byl klíč správně nastaven v prostředí, kde aplikace běží.", 'error');
-    } else {
-        setApiKeyAvailable(true);
-        addLog("API klíč pro Gemini je dostupný.", 'success');
-    }
+    // This can be used for a future check to see if the backend is available
+    addLog("Frontend inicializován. Připraven ke komunikaci s backendem.", 'system');
     setCurrentWorkflowStep(WorkflowStepValue.CONFIG);
-  }, [addLog]); 
-  
-  const advanceWorkflow = useCallback(async (step, delay = 500, logMessage, logType) => {
-    // If moving to ERROR step, ensure it's logged distinctly
-    if (step === WorkflowStepValue.ERROR && logMessage) {
-        addLog(logMessage, logType || 'error');
-    } else if (logMessage) {
-        addLog(logMessage, logType || 'info');
-    }
+  }, [addLog]);
 
+  const advanceWorkflow = useCallback(async (step: WorkflowStepValue, delay = 100, logMessage?: string, logType?: string) => {
+    if (logMessage) {
+      addLog(logMessage, logType || 'info');
+    }
     setCurrentWorkflowStep(step);
     setCompletedSteps(prev => new Set(prev).add(step));
-    
-    // The actual delay using await for a promise
     if (delay > 0) {
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }, [addLog]);
 
-
   const handleStartScraping = useCallback(async () => {
-    if (!apiKeyAvailable) {
-      addLog("Nelze spustit scrapování: API klíč pro Gemini není dostupný.", "error");
-      await advanceWorkflow(WorkflowStepValue.ERROR, 0, "Chyba konfigurace: API klíč chybí.", 'error');
-      return;
-    }
-
     setIsScraping(true);
-    setAds([]); 
+    setAds([]);
+    setMatchedAds([]); // Clear previous matches
     setLastScrapeDuration(null);
+    setCompletedSteps(new Set());
     const startTime = performance.now();
-    
-    setCompletedSteps(new Set()); 
 
-    addLog(`Spouštění scrapování pro ${config.brand} (${config.adType}), ${config.itemCount} položek.`, 'system');
-    
-    await advanceWorkflow(WorkflowStepValue.CONFIG, 0, "Konfigurace přijata.", 'success');
-    await advanceWorkflow(WorkflowStepValue.INIT_ANTI_DETECTION, 700, "Simulace inicializace anti-detection mechanismů (proxy, User-Agent)...", 'info');
-    await advanceWorkflow(WorkflowStepValue.SCRAPING, 1000, `Zahájeno stahování dat pro ${config.brand} z fiktivního serveru...`, 'info');
+    const scrapedDataByBrand: Map<string, { nabidka: Ad[], poptavka: Ad[] }> = new Map();
 
-    try {
-      const mockAds = await generateMockAds(config.brand, config.adType, config.itemCount);
-      setAds(mockAds);
-      await advanceWorkflow(WorkflowStepValue.PARSING, 800, `Parsování ${mockAds.length} inzerátů dokončeno.`, 'success');
-      await advanceWorkflow(WorkflowStepValue.SAVING, 600, `Data uložena (simulováno).`, 'success');
-      await advanceWorkflow(WorkflowStepValue.DISPLAYING_RESULTS, 0, "Výsledky jsou zobrazeny.", 'info');
-      addLog(`Scrapování úspěšně dokončeno. Načteno ${mockAds.length} inzerátů.`, 'success');
-    } catch (error) {
-      console.error("Chyba při scrapování:", error);
-      // advanceWorkflow will log the message if provided
-      await advanceWorkflow(WorkflowStepValue.ERROR, 0, `Chyba během scrapování: ${error.message}`, 'error');
-    } finally {
-      setIsScraping(false);
-      const endTime = performance.now();
-      setLastScrapeDuration((endTime - startTime) / 1000);
-      
-      // Only transition to MONITORING if not in ERROR state
-      // Check currentWorkflowStep directly instead of relying on completedSteps for this logic path to avoid stale closures issues
-      setCurrentWorkflowStep(prevStep => {
-          if (prevStep !== WorkflowStepValue.ERROR && completedSteps.has(WorkflowStepValue.DISPLAYING_RESULTS)) {
-            advanceWorkflow(WorkflowStepValue.MONITORING, 500, "Aktualizace monitoringu.", 'info').then(() => {
-                setCurrentWorkflowStep(WorkflowStepValue.DISPLAYING_RESULTS);
-                 setCompletedSteps(prev => new Set(prev).add(WorkflowStepValue.MONITORING).add(WorkflowStepValue.DISPLAYING_RESULTS));
-            });
-            return WorkflowStepValue.MONITORING; // Tentative step
-          } else if (prevStep === WorkflowStepValue.ERROR) {
-            setCompletedSteps(prev => new Set(prev).add(WorkflowStepValue.ERROR));
-            return WorkflowStepValue.ERROR;
-          }
-          return prevStep; // No change if conditions not met (e.g. error occurred earlier)
-      });
+    addLog(`Spouštím scrapování pro všechny značky a typy inzerátů...`, 'system');
+    await advanceWorkflow(WorkflowStepValue.SCRAPING, 0, "Odesílám požadavky na server...", 'info');
+
+    for (const brand of BRANDS) { // Iterate over all brands
+      // Initialize for each brand
+      scrapedDataByBrand.set(brand, { nabidka: [], poptavka: [] });
+
+      let brandUrlSegment = brand.toLowerCase().replace(/ /g, '-');
+      if (brand === 'Sony') {
+        brandUrlSegment = 'ericsson';
+      } else if (brand === 'Ostatní') {
+        brandUrlSegment = 'mobily';
+      }
+
+      for (const adTypeOption of AD_TYPE_OPTIONS) { // Iterate over ad types
+        const adType = adTypeOption.value;
+
+        const primaryScrapeUrl = `https://mobil.bazos.cz/${brandUrlSegment}/`;
+        const genericScrapeUrl = `https://mobil.bazos.cz/mobily/`; // Fallback URL
+
+        const urlsToTry = [primaryScrapeUrl];
+        if (brand !== 'Sony' && brand !== 'Ostatní' && primaryScrapeUrl !== genericScrapeUrl) {
+            // Only add generic fallback if it's not Sony or Ostatní, and not already the generic URL
+            urlsToTry.push(genericScrapeUrl);
+        }
+
+        let scrapedSuccessfully = false;
+        for (const urlToUse of urlsToTry) {
+            const configToSend = { ...config, brand: brand, adType: adType, url: urlToUse };
+
+            addLog(`Scrapuji pro značku: ${brand}, typ: ${adType} (${urlToUse})`, 'system');
+
+            try {
+                const response = await fetch('http://localhost:3001/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(configToSend),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `Server odpověděl chybou ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (result.data.length > 0) { // Only consider it successful if data is found
+                    addLog(`Úspěšně scrapováno ${result.data.length} inzerátů pro ${brand} (${adType}) z ${urlToUse}.`, 'success');
+                    const currentBrandData = scrapedDataByBrand.get(brand);
+                    if (currentBrandData) {
+                        if (adType === AdType.NABIDKA) {
+                            currentBrandData.nabidka.push(...result.data);
+                        } else {
+                            currentBrandData.poptavka.push(...result.data);
+                        }
+                    }
+                    scrapedSuccessfully = true;
+                    break; // Break from urlsToTry loop if successful
+                } else {
+                    addLog(`Nenalezeny žádné inzeráty pro ${brand} (${adType}) z ${urlToUse}.`, 'info');
+                }
+
+            } catch (error) {
+                console.error(`Chyba při komunikaci s backendem pro značku ${brand}, typ ${adType} z ${urlToUse}:`, error);
+                addLog(`Chyba při scrapování pro značku ${brand}, typ ${adType} z ${urlToUse}: ${error.message}`, 'error');
+            }
+        }
+
+        if (!scrapedSuccessfully) {
+            addLog(`Nepodařilo se scrapovat pro značku ${brand}, typ ${adType} z žádné URL.`, 'error');
+        }
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, apiKeyAvailable, addLog, advanceWorkflow, completedSteps]); // Added completedSteps due to its usage in finally block's dependency logic path
 
+    // Now, perform the comparison
+    const foundMatches: { offer: Ad, demand: Ad }[] = [];
+
+    scrapedDataByBrand.forEach((data, brandName) => {
+      data.poptavka.forEach(demandAd => {
+        const demandPrice = parsePrice(demandAd.price);
+        if (demandPrice === null) return; // Skip if demand price cannot be parsed
+
+        data.nabidka.forEach(offerAd => {
+          const offerPrice = parsePrice(offerAd.price);
+          if (offerPrice === null) return; // Skip if offer price cannot be parsed
+
+          if (demandPrice > offerPrice) {
+            foundMatches.push({ offer: offerAd, demand: demandAd });
+          }
+        });
+      });
+    });
+
+    setMatchedAds(foundMatches); // Update the new state variable
+    await advanceWorkflow(WorkflowStepValue.DISPLAYING_RESULTS, 0, `Scrapování a porovnání dokončeno. Nalezeno ${foundMatches.length} shod.`, 'success');
+
+    setIsScraping(false);
+    const endTime = performance.now();
+    setLastScrapeDuration((endTime - startTime) / 1000);
+  }, [config, addLog, advanceWorkflow, parsePrice]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100">
@@ -147,23 +192,63 @@ const App = () => {
             setConfig={setConfig}
             onStartScraping={handleStartScraping}
             isScraping={isScraping}
-            apiKeyAvailable={apiKeyAvailable}
+            apiKeyAvailable={true} // Assuming backend handles this, simplifying for now
           />
-          {/* Show results display unless it's an error state from the beginning or no ads AND not scraping */}
-          {(ads.length > 0 || (currentWorkflowStep !== WorkflowStepValue.SCRAPING && currentWorkflowStep !== WorkflowStepValue.ERROR)) && 
-            <ResultsDisplay 
-              ads={ads} 
-              isLoading={isScraping && (currentWorkflowStep === WorkflowStepValue.SCRAPING || currentWorkflowStep === WorkflowStepValue.PARSING)} 
+          {matchedAds.length > 0 &&
+            <ResultsDisplay
+              matchedAds={matchedAds}
+              isLoading={isScraping}
+              onMatchClick={handleMatchClick}
             />
           }
           <MonitoringDashboard ads={ads} isScraping={isScraping} lastScrapeDuration={lastScrapeDuration} />
           <LogPanel logs={logs} />
-          
+
           <footer className="mt-12 text-center text-sm text-slate-500 py-6 border-t border-slate-700">
-            Vytvořeno s využitím React, Tailwind CSS a Gemini API. &copy; {new Date().getFullYear()}
+            Vytvořeno s využitím React, Node.js, a Cheerio. &copy; {new Date().getFullYear()}
             <p className="mt-1">Tato aplikace je určena pro demonstrační a vzdělávací účely.</p>
           </footer>
         </main>
+      </div>
+      <DetailModal show={showDetailModal} onClose={() => setShowDetailModal(false)} match={selectedMatch} />
+    </div>
+  );
+};
+
+const DetailModal: React.FC<{
+  show: boolean;
+  onClose: () => void;
+  match: { offer: Ad, demand: Ad } | null;
+}> = ({ show, onClose, match }) => {
+  if (!show || !match) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-slate-800 p-8 rounded-lg shadow-lg max-w-2xl w-full relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-100 text-2xl">&times;</button>
+        <h2 className="text-2xl font-bold text-sky-400 mb-4">Detail Shody</h2>
+
+        <div className="mb-6">
+          <h3 className="text-xl font-semibold text-amber-400 mb-2">Nabídka</h3>
+          <p className="text-slate-300"><strong>Značka:</strong> {match.offer.brand}</p>
+          <p className="text-slate-300"><strong>Název:</strong> {match.offer.title}</p>
+          <p className="text-slate-300"><strong>Cena:</strong> {match.offer.price}</p>
+          <p className="text-slate-300"><strong>Popis:</strong> {match.offer.description}</p>
+          <p className="text-slate-300"><strong>Datum:</strong> {match.offer.date_posted}</p>
+          <p className="text-slate-300"><strong>Lokalita:</strong> {match.offer.location}</p>
+          <a href={match.offer.url} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Zobrazit inzerát</a>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-amber-400 mb-2">Poptávka</h3>
+          <p className="text-slate-300"><strong>Značka:</strong> {match.demand.brand}</p>
+          <p className="text-slate-300"><strong>Název:</strong> {match.demand.title}</p>
+          <p className="text-slate-300"><strong>Cena:</strong> {match.demand.price}</p>
+          <p className="text-slate-300"><strong>Popis:</strong> {match.demand.description}</p>
+          <p className="text-slate-300"><strong>Datum:</strong> {match.demand.date_posted}</p>
+          <p className="text-slate-300"><strong>Lokalita:</strong> {match.demand.location}</p>
+          <a href={match.demand.url} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Zobrazit inzerát</a>
+        </div>
       </div>
     </div>
   );
