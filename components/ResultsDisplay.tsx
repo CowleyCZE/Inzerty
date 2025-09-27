@@ -35,10 +35,9 @@ const AdCard: React.FC<{ ad: Ad }> = ({ ad }) => (
   </div>
 );
 
-const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad, demand: Ad }, onClick: (offer: Ad, demand: Ad) => void }> = ({ matchedAd, onClick }) => (
+const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad, demand: Ad } }> = ({ matchedAd }) => (
   <div
-    className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col cursor-pointer"
-    onClick={() => onClick(matchedAd.offer, matchedAd.demand)}
+    className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col"
   >
     <div className="p-5 flex flex-col flex-grow">
       <h3 className="text-lg font-semibold text-sky-400 mb-2 truncate">Shoda pro {matchedAd.offer.brand}</h3>
@@ -56,7 +55,7 @@ const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad, demand: Ad }, onClick: (
 );
 
 
-const ResultsDisplay = ({ matchedAds, isLoading, onMatchClick }) => {
+const ResultsDisplay = ({ matchedAds, isLoading }) => {
   if (isLoading) {
     return (
       <div className="mt-8 text-center p-10">
@@ -85,7 +84,7 @@ const ResultsDisplay = ({ matchedAds, isLoading, onMatchClick }) => {
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {matchedAds.map((match, index) => (
-          <MatchedAdCard key={index} matchedAd={match} onClick={onMatchClick} />
+          <MatchedAdCard key={index} matchedAd={match} />
         ))}
       </div>
     </div>

@@ -1,6 +1,14 @@
 import React from 'react';
 
-const Header = () => {
+interface HeaderProps {
+  onStartScraping: () => void;
+  isScraping: boolean;
+  onStartComparison: () => void;
+  isComparing: boolean;
+  appState: string;
+}
+
+const Header: React.FC<HeaderProps> = ({ onStartScraping, isScraping, onStartComparison, isComparing, appState }) => {
   return (
     <header className="bg-slate-800 p-6 shadow-lg sticky top-0 z-50">
       <div className="container mx-auto flex items-center justify-between">
@@ -12,8 +20,28 @@ const Header = () => {
             Český Inzertní Scraper <span className="text-slate-400 text-2xl font-normal">UI</span>
           </h1>
         </div>
-        <div className="text-sm text-slate-400">
-          Simulace & Vizualizace
+        <div className="flex items-center space-x-4">
+          {appState === 'idle' && (
+            <button
+              onClick={onStartScraping}
+              disabled={isScraping}
+              className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors duration-300"
+            >
+              {isScraping ? 'Scraping...' : 'Start Scraping'}
+            </button>
+          )}
+          {appState === 'scraping-done' && (
+            <button
+              onClick={onStartComparison}
+              disabled={isComparing}
+              className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors duration-300"
+            >
+              {isComparing ? 'Comparing...' : 'Start Comparison'}
+            </button>
+          )}
+          <div className="text-sm text-slate-400">
+            Simulace & Vizualizace
+          </div>
         </div>
       </div>
     </header>
