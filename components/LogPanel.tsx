@@ -1,7 +1,18 @@
 import React, { useRef, useEffect } from 'react';
 
-const LogPanel = ({ logs }) => {
-  const logContainerRef = useRef(null);
+interface LogEntry {
+  id: string;
+  timestamp: string;
+  message: string;
+  type: 'info' | 'success' | 'error' | 'system';
+}
+
+interface LogPanelProps {
+  logs: LogEntry[];
+}
+
+const LogPanel: React.FC<LogPanelProps> = ({ logs }) => {
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (logContainerRef.current) {
@@ -9,7 +20,7 @@ const LogPanel = ({ logs }) => {
     }
   }, [logs]);
 
-  const getLogColor = (type) => {
+  const getLogColor = (type: LogEntry['type']): string => {
     switch (type) {
       case 'error': return 'text-red-400';
       case 'success': return 'text-green-400';
@@ -18,8 +29,8 @@ const LogPanel = ({ logs }) => {
       default: return 'text-slate-300';
     }
   };
-  
-  const getLogIcon = (type) => {
+
+  const getLogIcon = (type: LogEntry['type']): React.ReactNode => {
     switch (type) {
       case 'error': return <span className="mr-2 text-red-500 shrink-0">❌</span>;
       case 'success': return <span className="mr-2 text-green-500 shrink-0">✅</span>;
@@ -38,8 +49,8 @@ const LogPanel = ({ logs }) => {
         </svg>
         Log Událostí
       </h2>
-      <div 
-        ref={logContainerRef} 
+      <div
+        ref={logContainerRef}
         className="h-64 overflow-y-auto bg-slate-900 p-4 rounded-lg border border-slate-700 text-sm font-mono space-y-1"
       >
         {logs.map(log => (

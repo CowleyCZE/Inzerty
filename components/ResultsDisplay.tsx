@@ -3,11 +3,11 @@ import { Ad } from '../types'; // Assuming Ad type is imported
 
 const AdCard: React.FC<{ ad: Ad }> = ({ ad }) => (
   <div className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col">
-    <img 
-        src={ad.image_url} 
-        alt={ad.title} 
-        className="w-full h-48 object-cover" 
-        onError={(e) => { e.currentTarget.src = 'https://picsum.photos/seed/fallback/300/200'; }}
+    <img
+      src={ad.image_url}
+      alt={ad.title}
+      className="w-full h-48 object-cover"
+      onError={(e) => { e.currentTarget.src = 'https://picsum.photos/seed/fallback/300/200'; }}
     />
     <div className="p-5 flex flex-col flex-grow">
       <h3 className="text-lg font-semibold text-sky-400 mb-2 truncate" title={ad.title}>{ad.title}</h3>
@@ -16,16 +16,16 @@ const AdCard: React.FC<{ ad: Ad }> = ({ ad }) => (
         <LocationPinIcon /> {ad.location}
       </p>
       <p className="text-xs text-slate-400 mb-3 flex items-center">
-        <CalendarIcon /> {ad.date_posted} 
+        <CalendarIcon /> {ad.date_posted}
         {ad.is_top && <span className="ml-2 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">TOP</span>}
       </p>
       <p className="text-sm text-slate-300 mb-4 flex-grow h-12 overflow-hidden text-ellipsis line-clamp-2" title={ad.description}>{ad.description}</p>
       <div className="mt-auto flex justify-between items-center text-xs text-slate-400">
         <span>{ad.views || 'N/A'} zobrazení</span>
-        <a 
-          href={ad.url} 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <a
+          href={ad.url}
+          target="_blank"
+          rel="noopener noreferrer"
           className="px-3 py-1 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors text-sm"
         >
           Detail
@@ -55,7 +55,12 @@ const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad, demand: Ad } }> = ({ mat
 );
 
 
-const ResultsDisplay = ({ matchedAds, isLoading }) => {
+interface ResultsDisplayProps {
+  matchedAds: { offer: Ad; demand: Ad }[];
+  isLoading: boolean;
+}
+
+const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }) => {
   if (isLoading) {
     return (
       <div className="mt-8 text-center p-10">

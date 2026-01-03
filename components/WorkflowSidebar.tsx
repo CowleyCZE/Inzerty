@@ -2,7 +2,12 @@ import React from 'react';
 import { WorkflowStepValue } from '../types';
 import { WORKFLOW_STEPS_CONFIG, ETHICAL_GUIDELINES } from '../constants.tsx'; // Updated extension
 
-const WorkflowSidebar = ({ currentStep, completedSteps }) => {
+interface WorkflowSidebarProps {
+  currentStep: string;
+  completedSteps: Set<string>;
+}
+
+const WorkflowSidebar: React.FC<WorkflowSidebarProps> = ({ currentStep, completedSteps }) => {
   return (
     <aside className="w-80 bg-slate-800 p-6 space-y-8 h-full overflow-y-auto shadow-xl">
       <div>
@@ -26,7 +31,7 @@ const WorkflowSidebar = ({ currentStep, completedSteps }) => {
             } else {
               itemClass += "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white ";
             }
-            if(isError){
+            if (isError) {
               itemClass = "flex items-center p-3 rounded-lg bg-red-600 text-white shadow-md scale-105 ";
             }
 
@@ -44,7 +49,7 @@ const WorkflowSidebar = ({ currentStep, completedSteps }) => {
 
       <div>
         <h2 className="text-xl font-semibold text-amber-400 mb-4 border-b border-slate-700 pb-2 flex items-center">
-         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="hero-icon w-6 h-6 mr-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="hero-icon w-6 h-6 mr-2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
           {ETHICAL_GUIDELINES.title}

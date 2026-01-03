@@ -12,7 +12,7 @@ if (!API_KEY) {
 
 const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
-const parseJsonFromText = (text) => {
+const parseJsonFromText = (text: string): any => {
   let jsonStr = text.trim();
   const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
   const match = jsonStr.match(fenceRegex);
@@ -23,36 +23,36 @@ const parseJsonFromText = (text) => {
     return JSON.parse(jsonStr);
   } catch (e) {
     console.error("Nepodařilo se parsovat JSON odpověď:", e, "Původní text:", text);
-    throw new Error(`Chyba parsování JSON: ${ e.message }`);
+    throw new Error(`Chyba parsování JSON: ${e.message}`);
   }
 };
 
 
-export const generateMockAds = async (brand, adType, count) => {
+export const generateMockAds = async (brand: string, adType: string, count: number) => {
   if (!ai) {
     console.warn("Gemini AI není inicializováno kvůli chybějícímu nebo neplatnému API klíči. Vracím prázdná data.");
     // Fallback: Return empty array or predefined mock data if API key is missing
     const fallbackAds = Array.from({ length: count }).map((_, i) => ({
-        id: crypto.randomUUID(),
-        title: `Nouzový (bez API) ${brand} ${adType} ${i + 1}`,
-        price: `${Math.floor(Math.random() * 10000) + 1000} Kč`,
-        location: "Neznámá Lokace",
-        description: "Toto je nouzový inzerát vygenerovaný kvůli chybějícímu API klíči.",
-        date_posted: new Date().toLocaleDateString('cs-CZ'),
-        url: "#",
-        image_url: `https://picsum.photos/seed/${crypto.randomUUID()}/300/200`,
-        ad_type: adType,
-        brand: brand,
-        scraped_at: new Date().toISOString(),
-        views: `${Math.floor(Math.random() * 200)}x`,
-        is_top: Math.random() < 0.2,
-      }));
+      id: crypto.randomUUID(),
+      title: `Nouzový (bez API) ${brand} ${adType} ${i + 1}`,
+      price: `${Math.floor(Math.random() * 10000) + 1000} Kč`,
+      location: "Neznámá Lokace",
+      description: "Toto je nouzový inzerát vygenerovaný kvůli chybějícímu API klíči.",
+      date_posted: new Date().toLocaleDateString('cs-CZ'),
+      url: "#",
+      image_url: `https://picsum.photos/seed/${crypto.randomUUID()}/300/200`,
+      ad_type: adType,
+      brand: brand,
+      scraped_at: new Date().toISOString(),
+      views: `${Math.floor(Math.random() * 200)}x`,
+      is_top: Math.random() < 0.2,
+    }));
     alert(`Gemini AI není inicializováno. Ujistěte se, že máte správně nastavený API klíč v souboru .env.local a že jste restartovali server. Zobrazují se nouzová data.`);
-    return Promise.resolve(fallbackAds); 
+    return Promise.resolve(fallbackAds);
   }
 
   const adTypeDescription = adType === AdType.NABIDKA ? "nabídka (prodej)" : "poptávka (koupě)";
-  
+
   const prompt = `
 Vygeneruj ${count} fiktivních inzerátů na mobilní telefony značky "${brand}" typu "${adTypeDescription}" pro český inzertní portál jako je Bazos.cz.
 Každý inzerát musí obsahovat následující pole:
@@ -95,7 +95,7 @@ Příklad jednoho objektu:
 
     const rawText = response.text;
     const parsedData = parseJsonFromText(rawText);
-    
+
     if (!Array.isArray(parsedData)) {
       console.error("Odpověď od Gemini není pole:", parsedData);
       throw new Error("Odpověď od Gemini není ve formátu pole.");
@@ -122,20 +122,20 @@ Příklad jednoho objektu:
   } catch (error) {
     console.error("Chyba při komunikaci s Gemini API:", error);
     const fallbackAds = Array.from({ length: count }).map((_, i) => ({
-        id: crypto.randomUUID(),
-        title: `Nouzový ${brand} ${adType} ${i + 1}`,
-        price: `${Math.floor(Math.random() * 10000) + 1000} Kč`,
-        location: "Neznámá Lokace",
-        description: "Toto je nouzový inzerát vygenerovaný kvůli chybě API.",
-        date_posted: new Date().toLocaleDateString('cs-CZ'),
-        url: "#",
-        image_url: `https://picsum.photos/seed/${crypto.randomUUID()}/300/200`,
-        ad_type: adType,
-        brand: brand,
-        scraped_at: new Date().toISOString(),
-        views: `${Math.floor(Math.random() * 200)}x`,
-        is_top: Math.random() < 0.2,
-      }));
+      id: crypto.randomUUID(),
+      title: `Nouzový ${brand} ${adType} ${i + 1}`,
+      price: `${Math.floor(Math.random() * 10000) + 1000} Kč`,
+      location: "Neznámá Lokace",
+      description: "Toto je nouzový inzerát vygenerovaný kvůli chybě API.",
+      date_posted: new Date().toLocaleDateString('cs-CZ'),
+      url: "#",
+      image_url: `https://picsum.photos/seed/${crypto.randomUUID()}/300/200`,
+      ad_type: adType,
+      brand: brand,
+      scraped_at: new Date().toISOString(),
+      views: `${Math.floor(Math.random() * 200)}x`,
+      is_top: Math.random() < 0.2,
+    }));
     alert(`Došlo k chybě při komunikaci s Gemini API: ${error.message}. Zobrazují se nouzová data. Zkontrolujte API klíč a konzoli pro detaily.`);
     return fallbackAds;
   }

@@ -36,6 +36,14 @@ export const AdType = {
   POPTAVKA: 'poptavka',
 };
 
+export interface LogEntry {
+  id?: string;
+  message: string;
+  type: 'info' | 'success' | 'error' | 'system';
+  timestamp?: string;
+  progress?: number;
+}
+
 export const WorkflowStepValue = {
   IDLE: 'idle',
   CONFIG: 'konfigurace',
