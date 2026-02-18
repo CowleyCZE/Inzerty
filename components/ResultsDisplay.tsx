@@ -35,12 +35,26 @@ const AdCard: React.FC<{ ad: Ad }> = ({ ad }) => (
   </div>
 );
 
-const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad, demand: Ad } }> = ({ matchedAd }) => (
+const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad & { similarity?: number, ai?: boolean }, demand: Ad } }> = ({ matchedAd }) => (
   <div
     className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col"
   >
     <div className="p-5 flex flex-col flex-grow">
-      <h3 className="text-lg font-semibold text-sky-400 mb-2 truncate">Shoda pro {matchedAd.offer.brand}</h3>
+      <div className="flex justify-between items-start mb-2">
+        <h3 className="text-lg font-semibold text-sky-400 truncate">Shoda pro {matchedAd.offer.brand}</h3>
+        <div className="flex flex-col items-end space-y-1">
+          {matchedAd.offer.similarity !== undefined && (
+            <span className="text-xs font-mono bg-sky-500/20 text-sky-300 px-2 py-1 rounded">
+              Shoda: {matchedAd.offer.similarity}%
+            </span>
+          )}
+          {matchedAd.offer.ai && (
+            <span className="text-[10px] font-bold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded border border-purple-500/30">
+              AI MATCH
+            </span>
+          )}
+        </div>
+      </div>
       <p className="text-sm text-slate-300 mb-1">
         <span className="font-bold">Nabídka:</span> {matchedAd.offer.title} ({matchedAd.offer.price})
       </p>
@@ -56,7 +70,7 @@ const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad, demand: Ad } }> = ({ mat
 
 
 interface ResultsDisplayProps {
-  matchedAds: { offer: Ad; demand: Ad }[];
+  matchedAds: { offer: Ad & { similarity?: number; ai?: boolean }; demand: Ad }[];
   isLoading: boolean;
 }
 

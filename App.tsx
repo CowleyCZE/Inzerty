@@ -25,10 +25,41 @@ const App = () => {
   const [matchedAds, setMatchedAds] = useState<{ offer: Ad, demand: Ad }[]>([]);
   const [isScraping, setIsScraping] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
-  const [scrapedData, setScrapedData] = useState(null);
+  // const [scrapedData, setScrapedData] = useState(null); // No longer needed
   const [scrapeSummary, setScrapeSummary] = useState(null);
   const [progress, setProgress] = useState('Ready to start.');
   const [appState, setAppState] = useState('idle');
+  const [ollamaActive, setOllamaActive] = useState(false);
+
+  useEffect(() => {
+    const checkOllama = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/ollama/status');
+        const data = await res.json();
+        setOllamaActive(data.status);
+      } catch (e) {
+        console.error("Failed to check Ollama status");
+      }
+    };
+    checkOllama();
+  }, []);
+
+  const toggleOllama = async () => {
+    try {
+      const action = ollamaActive ? 'stop' : 'start';
+      setProgress(`${action === 'start' ? 'Starting' : 'Stopping'} Ollama server...`);
+      const res = await fetch('http://localhost:3001/ollama/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json();
+      setOllamaActive(data.status);
+      setProgress(data.message);
+    } catch (e) {
+      setProgress("Failed to toggle Ollama.");
+    }
+  };
 
   const [lastScrapeDuration, setLastScrapeDuration] = useState<number | null>(null);
 
@@ -57,10 +88,10 @@ const App = () => {
       }
 
       const result = await response.json();
-      setScrapedData(result.data);
+      // setScrapedData(result.data); // No longer needed as data is in DB
       setScrapeSummary({ 
-        nabidka: result.data.nabidka.length,
-        poptavka: result.data.poptavka.length
+        nabidka: result.data.nabidkaCount,
+        poptavka: result.data.poptavkaCount
       });
       setAppState('scraping-done');
       setProgress('Scraping finished. Ready to compare.');
@@ -77,11 +108,6 @@ const App = () => {
   }, [config]);
 
   const handleStartComparison = useCallback(async () => {
-    if (!scrapedData) {
-      setProgress('No scraped data to compare.');
-      return;
-    }
-
     setIsComparing(true);
     setAppState('comparing');
     setProgress('Starting comparison process...');
@@ -92,7 +118,7 @@ const App = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ scrapedData }),
+        body: JSON.stringify({}), // No longer sending scrapedData, backend fetches from DB
       });
 
       if (!response.ok) {
@@ -112,11 +138,19 @@ const App = () => {
     }
 
     setIsComparing(false);
-  }, [scrapedData]);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100">
-      <Header onStartScraping={handleStartScraping} isScraping={isScraping} onStartComparison={handleStartComparison} isComparing={isComparing} appState={appState} />
+      <Header 
+        onStartScraping={handleStartScraping} 
+        isScraping={isScraping} 
+        onStartComparison={handleStartComparison} 
+        isComparing={isComparing} 
+        appState={appState}
+        ollamaActive={ollamaActive}
+        onToggleOllama={toggleOllama}
+      />
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           <ProgressDisplay progress={progress} />

@@ -6,9 +6,19 @@ interface HeaderProps {
   onStartComparison: () => void;
   isComparing: boolean;
   appState: string;
+  ollamaActive: boolean;
+  onToggleOllama: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onStartScraping, isScraping, onStartComparison, isComparing, appState }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  onStartScraping, 
+  isScraping, 
+  onStartComparison, 
+  isComparing, 
+  appState,
+  ollamaActive,
+  onToggleOllama
+}) => {
   return (
     <header className="bg-slate-800 p-6 shadow-lg sticky top-0 z-50">
       <div className="container mx-auto flex items-center justify-between">
@@ -21,6 +31,18 @@ const Header: React.FC<HeaderProps> = ({ onStartScraping, isScraping, onStartCom
           </h1>
         </div>
         <div className="flex items-center space-x-4">
+          <button
+            onClick={onToggleOllama}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-semibold transition-colors duration-300 ${
+              ollamaActive 
+                ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${ollamaActive ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`}></span>
+            <span>{ollamaActive ? 'AI Server ON' : 'AI Server OFF'}</span>
+          </button>
+
           {appState === 'idle' && (
             <button
               onClick={onStartScraping}
