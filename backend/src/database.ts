@@ -12,7 +12,7 @@ export const initDb = async () => {
   if (db) return db;
 
   const dbPath = path.join(__dirname, '..', 'inzerty.db');
-  
+
   db = await open({
     filename: dbPath,
     driver: sqlite3.Database
@@ -54,10 +54,10 @@ export const initDb = async () => {
 
 export const saveAd = async (ad: any) => {
   const db = await initDb();
-  
+
   // Clean price for storage
-  const priceValue = ad.price ? parseFloat(ad.price.replace(/[^0-9,-]+/g, '').replace(',', '.')) : null;
-  const safePriceValue = isNaN(priceValue) ? null : priceValue;
+  const rawPrice = ad.price ? parseFloat(ad.price.replace(/[^0-9,-]+/g, '').replace(',', '.')) : null;
+  const safePriceValue = rawPrice !== null && !isNaN(rawPrice) ? rawPrice : null;
 
   try {
     await db.run(
@@ -91,16 +91,30 @@ export const getAdsByBrand = async (brand: string, adType: string) => {
 };
 
 export const getAllAds = async () => {
-    const db = await initDb();
-    return db.all('SELECT * FROM ads ORDER BY scraped_at DESC LIMIT 1000');
+  const db = await initDb();
+  return db.all('SELECT * FROM ads ORDER BY scraped_at DESC LIMIT 1000');
 };
 
 export const getAllAdsByType = async (adType: string) => {
-    const db = await initDb();
-    return db.all('SELECT * FROM ads WHERE ad_type = ? ORDER BY scraped_at DESC LIMIT 1000', [adType]);
+  const db = await initDb();
+  return db.all('SELECT * FROM ads WHERE ad_type = ? ORDER BY scraped_at DESC LIMIT 1000', [adType]);
 };
 
 export const updateAdModelAi = async (id: string, model: string) => {
-    const db = await initDb();
-    await db.run('UPDATE ads SET model_ai = ? WHERE id = ?', [model, id]);
+  const db = await initDb();
+  await db.run('UPDATE ads SET model_ai = ? WHERE id = ?', [model, id]);
+};
+
+export const saveMatch = async (offerId: string, demandId: string, score: number, isAi: boolean) => {
+  const db = await initDb();
+  const createdAt = new Date().toISOString();
+  try {
+    await db.run(
+      `INSERT OR REPLACE INTO matches (offer_id, demand_id, similarity_score, is_ai_match, created_at)
+             VALUES (?, ?, ?, ?, ?)`,
+      [offerId, demandId, score, isAi ? 1 : 0, createdAt]
+    );
+  } catch (error) {
+    console.error('Error saving match:', error);
+  }
 };

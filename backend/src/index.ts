@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi, getAllAdsByType } from './database.js'; // Added .js for ESM if needed, or check project config. Assuming TS compiles to JS.
+import { initDb, saveAd, getAllAds, updateAdModelAi, getAllAdsByType, saveMatch } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,7 +63,7 @@ app.post('/ollama/toggle', async (req, res) => {
             status: isOllamaRunning
         });
     } else {
-        // Stopping ollama is tricky via spawn, usually it's better to just check status 
+        // Stopping ollama is tricky via spawn, usually it's better to just check status
         // or use pkill if we are on linux/android
         spawn('pkill', ['ollama']);
         isOllamaRunning = false;
@@ -122,6 +122,11 @@ const parsePrice = (priceString: string): number | null => {
     return isNaN(price) ? null : price;
 };
 
+const extractStorage = (text: string): number | null => {
+    const match = text.match(/(\d+)\s*GB/i);
+    return match && match[1] ? parseInt(match[1], 10) : null;
+};
+
 const getSimilarity = (str1: string, str2: string): number => {
     const s1 = str1.toLowerCase().replace(/[^a-z0-9\s]/g, '');
     const s2 = str2.toLowerCase().replace(/[^a-z0-9\s]/g, '');
@@ -141,14 +146,15 @@ const getSimilarity = (str1: string, str2: string): number => {
 
 const extractModelWithAI = async (title: string, description: string): Promise<string> => {
     try {
-        const prompt = `Extract only the specific mobile phone model name from this ad title and description. 
-        Exclude brand and storage size. If it's an iPhone, include the number and Pro/Max/Plus.
+        const prompt = `Extract only the specific mobile phone model name and its storage capacity (in GB) from this ad. 
+        Format: "Model Name GB". Exclude brand. 
+        If it's an iPhone, include the number and Pro/Max/Plus.
         Title: "${title}"
         Description: "${description.substring(0, 100)}"
         Model:`;
 
         const response = await axios.post('http://localhost:11434/api/generate', {
-            model: 'llama3.2:1b', // Using a light model for speed on mobile
+            model: 'llama3.2:1b',
             prompt: prompt,
             stream: false
         }, { timeout: 10000 });
@@ -202,16 +208,19 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 break;
             }
             const link = $(element).find(selectors.link).attr('href');
+            const adTitle = $(element).find(selectors.title).text().trim();
+            const adDescription = $(element).find(selectors.description).text().trim();
+
             const ad = {
                 id: randomUUID(),
-                title: $(element).find(selectors.title).text().trim(),
+                title: adTitle,
                 price: $(element).find(selectors.price).text().trim(),
                 link: link && !link.startsWith('http') ? `${baseUrl}${link}` : link,
                 date_posted: adDateStr,
                 brand: brand,
                 ad_type: adType,
                 scraped_at: new Date().toISOString(),
-                description: $(element).find(selectors.description).text().trim(),
+                description: adDescription,
                 location: $(element).find(selectors.location).text().trim(),
             };
 
@@ -288,7 +297,7 @@ app.post('/scrape-all', async (req, res) => {
 
         res.json({
             message: `Scraping complete! Found ${totalNabidka} offers and ${totalPoptavka} demands. All ads saved to database.`,
-            data: { nabidkaCount: totalNabidka, poptavkaCount: totalPoptavka }, // Return counts, not actual data
+            data: { nabidkaCount: totalNabidka, poptavkaCount: totalPoptavka },
         });
 
     } catch (error) {
@@ -314,21 +323,21 @@ app.post('/compare', async (req, res) => {
             });
         }
 
-        const enrichedOffers = [];
-        const enrichedDemands = [];
+        const enrichedOffers: any[] = [];
+        const enrichedDemands: any[] = [];
 
         // Sequential processing to avoid overloading Ollama
         if (useAI) {
             console.log('Processing offers with AI...');
             for (const offerAd of allOffers) {
                 const model = offerAd.model_ai || await extractModelWithAI(offerAd.title, offerAd.description);
-                if (model && !offerAd.model_ai) await updateAdModelAi(offerAd.id, model); // Update if not already in DB
+                if (model && !offerAd.model_ai) await updateAdModelAi(offerAd.id, model);
                 enrichedOffers.push({ ...offerAd, model_ai: model });
             }
             console.log('Processing demands with AI...');
             for (const demandAd of allDemands) {
                 const model = demandAd.model_ai || await extractModelWithAI(demandAd.title, demandAd.description);
-                if (model && !demandAd.model_ai) await updateAdModelAi(demandAd.id, model); // Update if not already in DB
+                if (model && !demandAd.model_ai) await updateAdModelAi(demandAd.id, model);
                 enrichedDemands.push({ ...demandAd, model_ai: model });
             }
         } else {
@@ -341,50 +350,54 @@ app.post('/compare', async (req, res) => {
             if (demandPrice === null) continue;
 
             const demandModel = useAI ? demandAd.model_ai || '' : '';
+            const demandStorage = extractStorage(demandAd.title + ' ' + demandAd.description) || extractStorage(demandModel);
 
             for (const offerAd of enrichedOffers) {
                 if (demandAd.brand !== offerAd.brand) continue;
+                if (demandAd.url === offerAd.url) continue; // Skip same ad
 
                 const offerPrice = parsePrice(offerAd.price);
                 if (offerPrice === null) continue;
 
-                // Price Sanity Check: 
+                // Price Sanity Check:
                 // 1. Demand must be higher than offer (potential profit)
-                // 2. Demand shouldn't be TOO much higher (e.g. > 60% difference) 
-                //    because it likely means it's a different model version/storage.
+                // 2. Demand shouldn't be TOO much higher (e.g. > 60% difference)
                 if (demandPrice <= offerPrice) continue;
                 if (demandPrice > offerPrice * 1.6) continue;
 
                 let isMatch = false;
                 let similarityScore = 0;
 
-                if (useAI) {
-                    const offerModel = offerAd.model_ai || '';
+                const offerModel = useAI ? offerAd.model_ai || '' : '';
+                const offerStorage = extractStorage(offerAd.title + ' ' + offerAd.description) || extractStorage(offerModel);
 
-                    // Simple string equality or contains for AI models
+                // Storage capacity check - if both have storage info, they must match
+                if (demandStorage && offerStorage && demandStorage !== offerStorage) continue;
+
+                if (useAI) {
                     if (demandModel && offerModel) {
-                        isMatch = demandModel.toLowerCase().includes(offerModel.toLowerCase()) ||
-                            offerModel.toLowerCase().includes(demandModel.toLowerCase());
+                        isMatch = demandModel.toLowerCase().includes(offerModel.split(' ')[0].toLowerCase()) ||
+                            offerModel.toLowerCase().includes(demandModel.split(' ')[0].toLowerCase());
                         similarityScore = isMatch ? 100 : 0;
                     }
                 } else {
                     similarityScore = getSimilarity(demandAd.title, offerAd.title);
-                    isMatch = similarityScore >= 0.3;
+                    isMatch = similarityScore >= 0.35;
                     similarityScore = Math.round(similarityScore * 100);
                 }
 
                 if (isMatch) {
-                    foundMatches.push({
+                    const matchObj = {
                         offer: { ...offerAd, similarity: similarityScore, ai: useAI },
                         demand: demandAd
-                    });
+                    };
+                    foundMatches.push(matchObj);
+
+                    // Save match to database
+                    await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
                 }
             }
         }
-
-        // Save matches to database
-        // This will require adding a new function to database.ts
-        // For now, we return the matches.
 
         res.json({
             message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered)' : '(Keyword Powered)'}`,
