@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi } from './database.js'; // Added .js for ESM if needed, or check project config. Assuming TS compiles to JS.
+import { initDb, saveAd, getAllAds, updateAdModelAi, getAllAdsByType } from './database.js'; // Added .js for ESM if needed, or check project config. Assuming TS compiles to JS.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,9 +58,9 @@ app.post('/ollama/toggle', async (req, res) => {
             attempts++;
         }
 
-        return res.json({ 
-            message: isOllamaRunning ? 'Ollama started successfully.' : 'Ollama starting in background...', 
-            status: isOllamaRunning 
+        return res.json({
+            message: isOllamaRunning ? 'Ollama started successfully.' : 'Ollama starting in background...',
+            status: isOllamaRunning
         });
     } else {
         // Stopping ollama is tricky via spawn, usually it's better to just check status 
@@ -77,12 +77,12 @@ app.get('/ollama/status', async (req, res) => {
 });
 
 const BRANDS = [
-  'Samsung', 'Apple', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi'
+    'Samsung', 'Apple', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi'
 ];
 
 const AD_TYPE_OPTIONS = [
-  { value: 'nabidka', label: 'Nabídka (Prodej)' },
-  { value: 'poptavka', label: 'Poptávka (Koupě)' },
+    { value: 'nabidka', label: 'Nabídka (Prodej)' },
+    { value: 'poptavka', label: 'Poptávka (Koupě)' },
 ];
 
 const parseDate = (dateString: string): Date | null => {
@@ -116,26 +116,26 @@ const parseDate = (dateString: string): Date | null => {
 };
 
 const parsePrice = (priceString: string): number | null => {
-  if (!priceString) return null;
-  const cleanedPrice = priceString.replace(/[^0-9,-]+/g, '').replace(',', '.');
-  const price = parseFloat(cleanedPrice);
-  return isNaN(price) ? null : price;
+    if (!priceString) return null;
+    const cleanedPrice = priceString.replace(/[^0-9,-]+/g, '').replace(',', '.');
+    const price = parseFloat(cleanedPrice);
+    return isNaN(price) ? null : price;
 };
 
 const getSimilarity = (str1: string, str2: string): number => {
     const s1 = str1.toLowerCase().replace(/[^a-z0-9\s]/g, '');
     const s2 = str2.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-    
+
     const words1 = new Set(s1.split(/\s+/).filter(w => w.length > 1));
     const words2 = new Set(s2.split(/\s+/).filter(w => w.length > 1));
-    
+
     if (words1.size === 0 || words2.size === 0) return 0;
-    
+
     let intersection = 0;
     words1.forEach(word => {
         if (words2.has(word)) intersection++;
     });
-    
+
     return (2 * intersection) / (words1.size + words2.size);
 };
 
@@ -146,7 +146,7 @@ const extractModelWithAI = async (title: string, description: string): Promise<s
         Title: "${title}"
         Description: "${description.substring(0, 100)}"
         Model:`;
-        
+
         const response = await axios.post('http://localhost:11434/api/generate', {
             model: 'llama3.2:1b', // Using a light model for speed on mobile
             prompt: prompt,
@@ -214,7 +214,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 description: $(element).find(selectors.description).text().trim(),
                 location: $(element).find(selectors.location).text().trim(),
             };
-            
+
             // Save to SQLite
             try {
                 await saveAd(ad);
@@ -263,7 +263,7 @@ app.post('/scrape-all', async (req, res) => {
     }
 
     try {
-        const scrapedData = { nabidka: [], poptavka: [] };
+        const scrapedData: { nabidka: any[], poptavka: any[] } = { nabidka: [], poptavka: [] };
         let totalNabidka = 0;
         let totalPoptavka = 0;
 
@@ -360,12 +360,12 @@ app.post('/compare', async (req, res) => {
 
                 if (useAI) {
                     const offerModel = offerAd.model_ai || '';
-                    
+
                     // Simple string equality or contains for AI models
                     if (demandModel && offerModel) {
-                         isMatch = demandModel.toLowerCase().includes(offerModel.toLowerCase()) || 
-                                   offerModel.toLowerCase().includes(demandModel.toLowerCase());
-                         similarityScore = isMatch ? 100 : 0;
+                        isMatch = demandModel.toLowerCase().includes(offerModel.toLowerCase()) ||
+                            offerModel.toLowerCase().includes(demandModel.toLowerCase());
+                        similarityScore = isMatch ? 100 : 0;
                     }
                 } else {
                     similarityScore = getSimilarity(demandAd.title, offerAd.title);
@@ -374,9 +374,9 @@ app.post('/compare', async (req, res) => {
                 }
 
                 if (isMatch) {
-                    foundMatches.push({ 
-                        offer: { ...offerAd, similarity: similarityScore, ai: useAI }, 
-                        demand: demandAd 
+                    foundMatches.push({
+                        offer: { ...offerAd, similarity: similarityScore, ai: useAI },
+                        demand: demandAd
                     });
                 }
             }
@@ -399,5 +399,5 @@ app.post('/compare', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Backend server is running at http://localhost:${port}`);
+    console.log(`Backend server is running at http://localhost:${port}`);
 });
