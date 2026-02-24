@@ -1,139 +1,128 @@
-import React from 'react';
-import { Ad } from '../types'; // Assuming Ad type is imported
-
-const AdCard: React.FC<{ ad: Ad }> = ({ ad }) => (
-  <div className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col">
-    <img
-      src={ad.image_url}
-      alt={ad.title}
-      className="w-full h-48 object-cover"
-      onError={(e) => { e.currentTarget.src = 'https://picsum.photos/seed/fallback/300/200'; }}
-    />
-    <div className="p-5 flex flex-col flex-grow">
-      <h3 className="text-lg font-semibold text-sky-400 mb-2 truncate" title={ad.title}>{ad.title}</h3>
-      <p className="text-2xl font-bold text-amber-400 mb-2">{ad.price}</p>
-      <p className="text-sm text-slate-300 mb-1 flex items-center">
-        <LocationPinIcon /> {ad.location}
-      </p>
-      <p className="text-xs text-slate-400 mb-3 flex items-center">
-        <CalendarIcon /> {ad.date_posted}
-        {ad.is_top && <span className="ml-2 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">TOP</span>}
-      </p>
-      <p className="text-sm text-slate-300 mb-4 flex-grow h-12 overflow-hidden text-ellipsis line-clamp-2" title={ad.description}>{ad.description}</p>
-      <div className="mt-auto flex justify-between items-center text-xs text-slate-400">
-        <span>{ad.views || 'N/A'} zobrazení</span>
-        <a
-          href={ad.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors text-sm"
-        >
-          Detail
-        </a>
-      </div>
-    </div>
-  </div>
-);
-
-const MatchedAdCard: React.FC<{ matchedAd: { offer: Ad & { similarity?: number, ai?: boolean }, demand: Ad } }> = ({ matchedAd }) => (
-  <div
-    className="bg-slate-700 rounded-lg shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300 flex flex-col"
-  >
-    <div className="p-5 flex flex-col flex-grow">
-      <div className="flex justify-between items-start mb-2">
-        <h3 className="text-lg font-semibold text-sky-400 truncate">Shoda pro {matchedAd.offer.brand}</h3>
-        <div className="flex flex-col items-end space-y-1">
-          {matchedAd.offer.similarity !== undefined && (
-            <span className="text-xs font-mono bg-sky-500/20 text-sky-300 px-2 py-1 rounded">
-              Shoda: {matchedAd.offer.similarity}%
-            </span>
-          )}
-          {matchedAd.offer.ai && (
-            <span className="text-[10px] font-bold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded border border-purple-500/30">
-              AI MATCH
-            </span>
-          )}
-        </div>
-      </div>
-      <p className="text-sm text-slate-300 mb-1">
-        <span className="font-bold">Nabídka:</span> {matchedAd.offer.title} ({matchedAd.offer.price})
-      </p>
-      <p className="text-sm text-slate-300 mb-4">
-        <span className="font-bold">Poptávka:</span> {matchedAd.demand.title} ({matchedAd.demand.price})
-      </p>
-      <div className="mt-auto flex justify-between items-center text-xs text-slate-400">
-        <span>Rozdíl: {parseFloat(matchedAd.demand.price.replace(/[^0-9,-]+/g, '').replace(',', '.')) - parseFloat(matchedAd.offer.price.replace(/[^0-9,-]+/g, '').replace(',', '.'))} Kč</span>
-      </div>
-    </div>
-  </div>
-);
-
+import React, { useState } from 'react';
+import { Ad } from '../types';
 
 interface ResultsDisplayProps {
-  matchedAds: { offer: Ad & { similarity?: number; ai?: boolean }; demand: Ad }[];
-  isLoading: boolean;
+  matchedAds: { offer: Ad; demand: Ad; arbitrageScore?: number }[];
+  isLoading?: boolean;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }) => {
+  const [minProfit, setMinProfit] = useState<number>(0);
+
   if (isLoading) {
     return (
-      <div className="mt-8 text-center p-10">
-        <SpinnerIcon />
-        <p className="text-slate-300 text-lg mt-4">Generuji ukázková data...</p>
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
       </div>
     );
   }
 
-  if (matchedAds.length === 0) {
+  if (!matchedAds || matchedAds.length === 0) {
     return (
-      <div className="mt-8 p-6 bg-slate-800 rounded-lg shadow-inner text-center">
-        <InfoIcon />
-        <p className="text-slate-400 text-lg mt-2">Nebyly nalezeny žádné shody. Zkuste upravit konfiguraci.</p>
+      <div className="bg-slate-800 p-8 rounded-xl shadow-2xl mt-8 text-center border border-slate-700">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto text-slate-500 mb-4">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <p className="text-xl text-slate-300">Zatím nebyly nalezeny žádné shody.</p>
+        <p className="text-slate-500 mt-2">Spusťte porovnávání pro analýzu inzerátů.</p>
       </div>
     );
   }
+
+  const filteredMatches = matchedAds.filter(match => (match.arbitrageScore || 0) >= minProfit);
 
   return (
-    <div className="mt-8">
-      <h2 className="text-2xl font-semibold text-sky-400 mb-6 border-b border-slate-700 pb-3 flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="hero-icon w-6 h-6 mr-2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
-        </svg>
-        Nalezené Shody ({matchedAds.length})
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {matchedAds.map((match, index) => (
-          <MatchedAdCard key={index} matchedAd={match} />
+    <div className="bg-slate-800 p-6 rounded-xl shadow-2xl mt-8 border border-slate-700">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-700 pb-4">
+        <h2 className="text-2xl font-semibold text-emerald-400 flex items-center mb-4 md:mb-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 mr-2">
+            <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+          </svg>
+          Nalezené Arbitrážní Příležitosti ({filteredMatches.length})
+        </h2>
+        
+        <div className="flex items-center space-x-3 bg-slate-900 p-2 rounded-lg border border-slate-700">
+          <label htmlFor="minProfit" className="text-sm font-medium text-slate-300">Minimální zisk:</label>
+          <input
+            type="number"
+            id="minProfit"
+            value={minProfit}
+            onChange={(e) => setMinProfit(Number(e.target.value))}
+            className="w-24 bg-slate-700 border border-slate-600 text-emerald-400 font-bold rounded p-1 text-sm focus:ring-emerald-500 focus:border-emerald-500"
+            step="500"
+            min="0"
+          />
+          <span className="text-slate-400 text-sm">Kč</span>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {filteredMatches.map((match, index) => (
+          <div key={index} className="bg-slate-700/50 rounded-xl p-5 border border-slate-600 hover:border-emerald-500/50 transition-colors">
+            
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-600">
+              <span className="px-3 py-1 bg-slate-900 rounded-full text-xs font-medium text-slate-300 flex items-center">
+                <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                Podobnost: {match.offer.similarity || 'N/A'}%
+                {(match.offer as any).ai && <span className="ml-2 text-fuchsia-400 border border-fuchsia-400/30 px-1.5 rounded text-[10px]">AI</span>}
+              </span>
+              
+              <div className="text-right">
+                <span className="text-xs text-slate-400 block uppercase tracking-wider font-semibold">Potenciální Zisk</span>
+                <span className="text-xl font-bold text-emerald-400">
+                  +{match.arbitrageScore?.toLocaleString('cs-CZ')} Kč
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Nabídka (Koupit) */}
+              <div className="bg-slate-800 rounded-lg p-4 border-l-4 border-sky-500">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-sky-400 bg-sky-900/30 px-2 py-1 rounded">Nabídka (Koupit)</span>
+                  <span className="font-bold text-lg text-slate-100">{match.offer.price}</span>
+                </div>
+                <h4 className="font-medium text-slate-200 mb-2">{match.offer.title}</h4>
+                <p className="text-sm text-slate-400 line-clamp-2 mb-3">{match.offer.description}</p>
+                <a 
+                  href={match.offer.link || match.offer.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-sm text-sky-400 hover:text-sky-300"
+                >
+                  Otevřít inzerát
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 ml-1">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </a>
+              </div>
+
+              {/* Poptávka (Prodat) */}
+              <div className="bg-slate-800 rounded-lg p-4 border-l-4 border-purple-500">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-400 bg-purple-900/30 px-2 py-1 rounded">Poptávka (Prodat)</span>
+                  <span className="font-bold text-lg text-slate-100">{match.demand.price}</span>
+                </div>
+                <h4 className="font-medium text-slate-200 mb-2">{match.demand.title}</h4>
+                <p className="text-sm text-slate-400 line-clamp-2 mb-3">{match.demand.description}</p>
+                <a 
+                  href={match.demand.link || match.demand.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-sm text-purple-400 hover:text-purple-300"
+                >
+                  Otevřít inzerát
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 ml-1">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     </div>
   );
 };
-
-const LocationPinIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 mr-1.5 text-slate-500">
-    <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 0 0 .281-.145l.002-.001L10 18.46l-.39.221-.002.001.018.008.006.003ZM10 11.25a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" clipRule="evenodd" />
-    <path fillRule="evenodd" d="M12.552 1.106A8.5 8.5 0 0 0 10 0c-4.694 0-8.5 3.806-8.5 8.5 0 2.22.863 4.244 2.274 5.795l.24.261A55.717 55.717 0 0 0 9.45 18.41a1.752 1.752 0 0 0 1.099 0A55.74 55.74 0 0 0 17.228 14.57A8.474 8.474 0 0 0 18.5 8.5c0-1.01-.176-1.973-.502-2.858L17.75 1.106Z" clipRule="evenodd" />
-  </svg>
-);
-
-const CalendarIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 mr-1.5 text-slate-500">
-    <path fillRule="evenodd" d="M5.75 2a.75.75 0 0 1 .75.75V4h7V2.75a.75.75 0 0 1 1.5 0V4h.25A2.75 2.75 0 0 1 18 6.75v8.5A2.75 2.75 0 0 1 15.25 18H4.75A2.75 2.75 0 0 1 2 15.25v-8.5A2.75 2.75 0 0 1 4.75 4H5V2.75A.75.75 0 0 1 5.75 2Zm-1 5.5c0-.414.336-.75.75-.75h10.5a.75.75 0 0 1 0 1.5H5.5a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
-  </svg>
-);
-
-const InfoIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 text-sky-500 mx-auto mb-2">
-    <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 0 1 .67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 1 1-.671-1.34l.041-.022ZM12 9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
-  </svg>
-);
-
-const SpinnerIcon = () => (
-  <svg className="animate-spin mx-auto h-10 w-10 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-  </svg>
-);
 
 export default ResultsDisplay;
