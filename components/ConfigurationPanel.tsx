@@ -27,6 +27,10 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ config, setConf
     setConfig(prev => ({ ...prev, url: e.target.value }));
   };
 
+  const handleComparisonMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setConfig(prev => ({ ...prev, comparisonMethod: e.target.value } as any));
+  };
+
   const handleSelectorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setConfig(prev => ({
@@ -106,7 +110,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ config, setConf
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div>
           <label htmlFor="url" className="block text-sm font-medium text-slate-300 mb-1">
             Cílová URL
@@ -119,6 +123,22 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ config, setConf
             disabled={isScraping}
             className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 p-3 text-sm"
           />
+        </div>
+        <div>
+          <label htmlFor="comparisonMethod" className="block text-sm font-medium text-slate-300 mb-1">
+            Metoda porovnávání inzerátů
+          </label>
+          <select
+            id="comparisonMethod"
+            value={(config as any).comparisonMethod || 'auto'}
+            onChange={handleComparisonMethodChange}
+            disabled={isScraping}
+            className="w-full bg-slate-700 border border-slate-600 text-slate-100 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 p-3 text-sm"
+          >
+            <option value="auto">Automatický výběr (Auto)</option>
+            <option value="local-keyword">Bez AI (Termux / Rychlé - přesná shoda)</option>
+            <option value="ollama">Lokální AI (Ollama)</option>
+          </select>
         </div>
       </div>
 
@@ -177,6 +197,5 @@ const PlayIcon = () => (
         <path fillRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clipRule="evenodd" />
     </svg>
 );
-
 
 export default ConfigurationPanel;
