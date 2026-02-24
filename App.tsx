@@ -25,7 +25,6 @@ const App = () => {
   const [matchedAds, setMatchedAds] = useState<{ offer: Ad, demand: Ad }[]>([]);
   const [isScraping, setIsScraping] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
-  // const [scrapedData, setScrapedData] = useState(null); // No longer needed
   const [scrapeSummary, setScrapeSummary] = useState(null);
   const [progress, setProgress] = useState('Ready to start.');
   const [appState, setAppState] = useState('idle');
@@ -88,7 +87,6 @@ const App = () => {
       }
 
       const result = await response.json();
-      // setScrapedData(result.data); // No longer needed as data is in DB
       setScrapeSummary({ 
         nabidka: result.data.nabidkaCount,
         poptavka: result.data.poptavkaCount
@@ -118,7 +116,8 @@ const App = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}), // No longer sending scrapedData, backend fetches from DB
+        // Odeslání zvolené metody porovnávání do backendu
+        body: JSON.stringify({ comparisonMethod: (config as any).comparisonMethod || 'auto' }),
       });
 
       if (!response.ok) {
@@ -134,11 +133,11 @@ const App = () => {
     } catch (error) {
       console.error('Error during comparison:', error);
       setProgress(`Comparison failed: ${error.message}`);
-      setAppState('scraping-done'); // Revert to previous state
+      setAppState('scraping-done');
     }
 
     setIsComparing(false);
-  }, []);
+  }, [config]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100">
@@ -171,6 +170,5 @@ const App = () => {
     </div>
   );
 };
-
 
 export default App;
