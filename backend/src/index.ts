@@ -76,6 +76,40 @@ const BRANDS = [
     'Samsung', 'Apple', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi'
 ];
 
+const USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+];
+
+const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const fetchPageWithRetry = async (url: string, retries = 3): Promise<any> => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const delayMs = Math.floor(Math.random() * 2000) + 1500;
+            await sleep(delayMs);
+
+            const response = await axios.get(url, {
+                timeout: 30000,
+                headers: {
+                    'User-Agent': getRandomUserAgent(),
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'cs,cs-CZ;q=0.9,en;q=0.8'
+                }
+            });
+            return response;
+        } catch (error: any) {
+            console.warn(`Pokus ${attempt} selhal pro ${url}: ${error.message}`);
+            if (attempt === retries) throw error;
+            await sleep(attempt * 3000);
+        }
+    }
+};
+
 const parseDate = (dateString: string): Date | null => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -190,72 +224,72 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
         console.log(`Scraping page: ${currentPageUrl}`);
         pagesScraped++;
 
-        const response = await axios.get(currentPageUrl, {
-            timeout: 30000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-        });
-        const $ = cheerio.load(response.data);
-        const urlObject = new URL(currentPageUrl);
-        const baseUrl = urlObject.origin;
+        try {
+            const response = await fetchPageWithRetry(currentPageUrl);
+            const $ = cheerio.load(response.data);
+            const urlObject = new URL(currentPageUrl);
+            const baseUrl = urlObject.origin;
 
-        const items = $(selectors.item);
-        if (items.length === 0) {
-            console.log('No items found on page. Stopping.');
-            break;
-        }
-
-        let shouldStop = false;
-        for (const element of items.get()) {
-            const adDateStr = $(element).find(selectors.date).text().trim();
-            const adDate = parseDate(adDateStr);
-
-            if (adDate && adDate < twoMonthsAgo) {
-                console.log(`Found ad older than 2 months (${adDateStr}). Stopping.`);
-                shouldStop = true;
+            const items = $(selectors.item);
+            if (items.length === 0) {
+                console.log('No items found on page. Stopping.');
                 break;
             }
-            const link = $(element).find(selectors.link).attr('href');
-            const adTitle = $(element).find(selectors.title).text().trim();
-            const adDescription = $(element).find(selectors.description).text().trim();
 
-            const ad = {
-                id: randomUUID(),
-                title: adTitle,
-                price: $(element).find(selectors.price).text().trim(),
-                link: link && !link.startsWith('http') ? `${baseUrl}${link}` : link,
-                date_posted: adDateStr,
-                brand: brand,
-                ad_type: adType,
-                scraped_at: new Date().toISOString(),
-                description: adDescription,
-                location: $(element).find(selectors.location).text().trim(),
-            };
+            let shouldStop = false;
+            for (const element of items.get()) {
+                const adDateStr = $(element).find(selectors.date).text().trim();
+                const adDate = parseDate(adDateStr);
 
-            try {
-                await saveAd(ad);
-            } catch (err) {
-                console.error(`Failed to save ad ${ad.title}:`, err);
+                if (adDate && adDate < twoMonthsAgo) {
+                    console.log(`Found ad older than 2 months (${adDateStr}). Stopping.`);
+                    shouldStop = true;
+                    break;
+                }
+                const link = $(element).find(selectors.link).attr('href');
+                const adTitle = $(element).find(selectors.title).text().trim();
+                const adDescription = $(element).find(selectors.description).text().trim();
+
+                const ad = {
+                    id: randomUUID(),
+                    title: adTitle,
+                    price: $(element).find(selectors.price).text().trim(),
+                    link: link && !link.startsWith('http') ? `${baseUrl}${link}` : link,
+                    date_posted: adDateStr,
+                    brand: brand,
+                    ad_type: adType,
+                    scraped_at: new Date().toISOString(),
+                    description: adDescription,
+                    location: $(element).find(selectors.location).text().trim(),
+                };
+
+                try {
+                    await saveAd(ad);
+                } catch (err) {
+                    console.error(`Failed to save ad ${ad.title}:`, err);
+                }
+
+                scrapedAds.push(ad);
+
+                if (scrapedAds.length >= 50) {
+                    console.log('Reached 50 ads limit. Stopping.');
+                    shouldStop = true;
+                    break;
+                }
             }
 
-            scrapedAds.push(ad);
+            if (shouldStop) break;
 
-            if (scrapedAds.length >= 50) {
-                console.log('Reached 50 ads limit. Stopping.');
-                shouldStop = true;
-                break;
+            const nextPageLink = $('a:contains("Další")').attr('href');
+            if (nextPageLink) {
+                currentPageUrl = new URL(nextPageLink, baseUrl).href;
+            } else {
+                hasNextPage = false;
+                console.log('No next page link found. Stopping.');
             }
-        }
-
-        if (shouldStop) break;
-
-        const nextPageLink = $('a:contains("Další")').attr('href');
-        if (nextPageLink) {
-            currentPageUrl = new URL(nextPageLink, baseUrl).href;
-        } else {
-            hasNextPage = false;
-            console.log('No next page link found. Stopping.');
+        } catch (error) {
+            console.error(`Scraping failed completely for ${currentPageUrl} after retries. Preskakuji stránku.`);
+            break; 
         }
     }
 
