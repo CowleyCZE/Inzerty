@@ -2,7 +2,7 @@
 
 Webová aplikace pro scrapování, ukládání a porovnávání inzerátů mobilních telefonů (nabídka vs. poptávka) z Bazoš.cz. Cíl je najít arbitrážní příležitosti (koupit levněji, prodat dráž) a rovnou ukázat potenciální zisk.
 
-## Hlavní funkce
+---
 
 - **Inkrementální scraping**
   - scraper ukládá checkpointy (`brand + ad_type`) a při dalším běhu stahuje jen nové inzeráty,
