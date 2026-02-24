@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +18,8 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
