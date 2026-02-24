@@ -15,6 +15,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = 3001;
 
+// Konfigurace URL pro Ollamu - umožní běh přes síť (např. z Termuxu na PC)
+const OLLAMA_BASE_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const isLocalOllama = OLLAMA_BASE_URL.includes('localhost') || OLLAMA_BASE_URL.includes('127.0.0.1');
+
 initDb().catch(console.error);
 
 app.use(cors());
@@ -26,7 +30,7 @@ let isOllamaRunning = false;
 
 const checkOllamaStatus = async () => {
     try {
-        await axios.get('http://localhost:11434/api/tags');
+        await axios.get(`${OLLAMA_BASE_URL}/api/tags`);
         isOllamaRunning = true;
         return true;
     } catch (e) {
@@ -41,6 +45,13 @@ app.post('/ollama/toggle', async (req, res) => {
     if (action === 'start') {
         if (await checkOllamaStatus()) {
             return res.json({ message: 'Ollama is already running.', status: true });
+        }
+
+        if (!isLocalOllama) {
+            return res.json({ 
+                message: `Cannot start remote Ollama automatically. Please ensure it is running at ${OLLAMA_BASE_URL}`, 
+                status: false 
+            });
         }
 
         ollamaProcess = spawn('ollama', ['serve'], {
@@ -61,6 +72,13 @@ app.post('/ollama/toggle', async (req, res) => {
             status: isOllamaRunning
         });
     } else {
+        if (!isLocalOllama) {
+            return res.json({ 
+                message: 'Cannot stop remote Ollama from this device.', 
+                status: await checkOllamaStatus() 
+            });
+        }
+
         spawn('pkill', ['ollama']);
         isOllamaRunning = false;
         return res.json({ message: 'Ollama stop signal sent.', status: false });
@@ -183,7 +201,7 @@ const extractModelWithAI = async (title: string, description: string): Promise<s
         Description: "${description.substring(0, 100)}"
         Model:`;
 
-        const response = await axios.post('http://localhost:11434/api/generate', {
+        const response = await axios.post(`${OLLAMA_BASE_URL}/api/generate`, {
             model: 'llama3.2:1b',
             prompt: prompt,
             stream: false
@@ -198,7 +216,7 @@ const extractModelWithAI = async (title: string, description: string): Promise<s
 
 const getEmbeddingFromOllama = async (text: string): Promise<number[] | null> => {
     try {
-        const response = await axios.post('http://localhost:11434/api/embeddings', {
+        const response = await axios.post(`${OLLAMA_BASE_URL}/api/embeddings`, {
             model: 'llama3.2:1b',
             prompt: text
         }, { timeout: 15000 });
