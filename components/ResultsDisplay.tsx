@@ -8,6 +8,7 @@ interface ResultsDisplayProps {
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }) => {
   const [minProfit, setMinProfit] = useState<number>(0);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   if (isLoading) {
     return (
@@ -29,7 +30,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
     );
   }
 
-  const filteredMatches = matchedAds.filter(match => (match.arbitrageScore || 0) >= minProfit);
+  const filteredMatches = matchedAds
+    .filter(match => (match.arbitrageScore || 0) >= minProfit)
+    .sort((a, b) => sortOrder === 'desc'
+      ? (b.arbitrageScore || 0) - (a.arbitrageScore || 0)
+      : (a.arbitrageScore || 0) - (b.arbitrageScore || 0));
 
   return (
     <div className="bg-slate-800 p-6 rounded-xl shadow-2xl mt-8 border border-slate-700">
@@ -41,7 +46,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
           Nalezené Arbitrážní Příležitosti ({filteredMatches.length})
         </h2>
         
-        <div className="flex items-center space-x-3 bg-slate-900 p-2 rounded-lg border border-slate-700">
+        <div className="flex flex-wrap items-center gap-3 bg-slate-900 p-2 rounded-lg border border-slate-700">
           <label htmlFor="minProfit" className="text-sm font-medium text-slate-300">Minimální zisk:</label>
           <input
             type="number"
@@ -53,6 +58,17 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
             min="0"
           />
           <span className="text-slate-400 text-sm">Kč</span>
+
+          <label htmlFor="sortOrder" className="text-sm font-medium text-slate-300 ml-2">Řazení:</label>
+          <select
+            id="sortOrder"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
+            className="bg-slate-700 border border-slate-600 text-slate-100 rounded p-1 text-sm focus:ring-emerald-500 focus:border-emerald-500"
+          >
+            <option value="desc">Nejvyšší zisk</option>
+            <option value="asc">Nejnižší zisk</option>
+          </select>
         </div>
       </div>
 
