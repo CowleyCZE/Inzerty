@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi, getAllAdsByType, saveMatch } from './database.js';
+import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +15,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = 3001;
 
-// Initialize DB
 initDb().catch(console.error);
 
 app.use(cors());
@@ -50,7 +49,6 @@ app.post('/ollama/toggle', async (req, res) => {
         });
         ollamaProcess.unref();
 
-        // Wait a bit for server to start
         let attempts = 0;
         while (attempts < 5) {
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -63,8 +61,6 @@ app.post('/ollama/toggle', async (req, res) => {
             status: isOllamaRunning
         });
     } else {
-        // Stopping ollama is tricky via spawn, usually it's better to just check status
-        // or use pkill if we are on linux/android
         spawn('pkill', ['ollama']);
         isOllamaRunning = false;
         return res.json({ message: 'Ollama stop signal sent.', status: false });
@@ -80,36 +76,23 @@ const BRANDS = [
     'Samsung', 'Apple', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi'
 ];
 
-const AD_TYPE_OPTIONS = [
-    { value: 'nabidka', label: 'Nabídka (Prodej)' },
-    { value: 'poptavka', label: 'Poptávka (Koupě)' },
-];
-
 const parseDate = (dateString: string): Date | null => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (dateString.includes('Dnes')) {
-        return today;
-    }
-    if (dateString.includes('Včera')) {
-        return yesterday;
-    }
+    if (dateString.includes('Dnes')) return today;
+    if (dateString.includes('Včera')) return yesterday;
 
     const parts = dateString.match(/(\d+)\. (\d+)\. (\d{4})?/);
     if (parts && parts[1] && parts[2]) {
         const day = parseInt(parts[1], 10);
         const month = parseInt(parts[2], 10) - 1;
         let year = today.getFullYear();
-        if (parts[3]) {
-            year = parseInt(parts[3], 10);
-        }
+        if (parts[3]) year = parseInt(parts[3], 10);
         const date = new Date(year, month, day);
-        if (date > today && !parts[3]) {
-            date.setFullYear(year - 1);
-        }
+        if (date > today && !parts[3]) date.setFullYear(year - 1);
         return date;
     }
     return null;
@@ -144,6 +127,19 @@ const getSimilarity = (str1: string, str2: string): number => {
     return (2 * intersection) / (words1.size + words2.size);
 };
 
+const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+};
+
 const extractModelWithAI = async (title: string, description: string): Promise<string> => {
     try {
         const prompt = `Extract only the specific mobile phone model name and its storage capacity (in GB) from this ad. 
@@ -163,6 +159,19 @@ const extractModelWithAI = async (title: string, description: string): Promise<s
     } catch (error) {
         console.error('AI Extraction failed:', error);
         return '';
+    }
+};
+
+const getEmbeddingFromOllama = async (text: string): Promise<number[] | null> => {
+    try {
+        const response = await axios.post('http://localhost:11434/api/embeddings', {
+            model: 'llama3.2:1b',
+            prompt: text
+        }, { timeout: 15000 });
+        return response.data.embedding;
+    } catch (error) {
+        console.error('AI Embedding failed:', error);
+        return null;
     }
 };
 
@@ -224,7 +233,6 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 location: $(element).find(selectors.location).text().trim(),
             };
 
-            // Save to SQLite
             try {
                 await saveAd(ad);
             } catch (err) {
@@ -240,9 +248,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
             }
         }
 
-        if (shouldStop) {
-            break;
-        }
+        if (shouldStop) break;
 
         const nextPageLink = $('a:contains("Další")').attr('href');
         if (nextPageLink) {
@@ -312,7 +318,6 @@ app.post('/compare', async (req, res) => {
         const foundMatches: { offer: any, demand: any }[] = [];
         const useAI = await checkOllamaStatus();
 
-        // Fetch all offers and demands from the database
         const allOffers = await getAllAdsByType('nabidka');
         const allDemands = await getAllAdsByType('poptavka');
 
@@ -326,19 +331,30 @@ app.post('/compare', async (req, res) => {
         const enrichedOffers: any[] = [];
         const enrichedDemands: any[] = [];
 
-        // Sequential processing to avoid overloading Ollama
         if (useAI) {
             console.log('Processing offers with AI...');
             for (const offerAd of allOffers) {
                 const model = offerAd.model_ai || await extractModelWithAI(offerAd.title, offerAd.description);
                 if (model && !offerAd.model_ai) await updateAdModelAi(offerAd.id, model);
-                enrichedOffers.push({ ...offerAd, model_ai: model });
+
+                let embeddingData = offerAd.embedding ? JSON.parse(offerAd.embedding) : null;
+                if (!embeddingData) {
+                    embeddingData = await getEmbeddingFromOllama(`${offerAd.title} ${offerAd.description}`);
+                    if (embeddingData) await updateAdEmbedding(offerAd.id, JSON.stringify(embeddingData));
+                }
+                enrichedOffers.push({ ...offerAd, model_ai: model, parsed_embedding: embeddingData });
             }
             console.log('Processing demands with AI...');
             for (const demandAd of allDemands) {
                 const model = demandAd.model_ai || await extractModelWithAI(demandAd.title, demandAd.description);
                 if (model && !demandAd.model_ai) await updateAdModelAi(demandAd.id, model);
-                enrichedDemands.push({ ...demandAd, model_ai: model });
+
+                let embeddingData = demandAd.embedding ? JSON.parse(demandAd.embedding) : null;
+                if (!embeddingData) {
+                    embeddingData = await getEmbeddingFromOllama(`${demandAd.title} ${demandAd.description}`);
+                    if (embeddingData) await updateAdEmbedding(demandAd.id, JSON.stringify(embeddingData));
+                }
+                enrichedDemands.push({ ...demandAd, model_ai: model, parsed_embedding: embeddingData });
             }
         } else {
             enrichedOffers.push(...allOffers);
@@ -354,14 +370,11 @@ app.post('/compare', async (req, res) => {
 
             for (const offerAd of enrichedOffers) {
                 if (demandAd.brand !== offerAd.brand) continue;
-                if (demandAd.url === offerAd.url) continue; // Skip same ad
+                if (demandAd.url === offerAd.url) continue;
 
                 const offerPrice = parsePrice(offerAd.price);
                 if (offerPrice === null) continue;
 
-                // Price Sanity Check:
-                // 1. Demand must be higher than offer (potential profit)
-                // 2. Demand shouldn't be TOO much higher (e.g. > 60% difference)
                 if (demandPrice <= offerPrice) continue;
                 if (demandPrice > offerPrice * 1.6) continue;
 
@@ -371,11 +384,25 @@ app.post('/compare', async (req, res) => {
                 const offerModel = useAI ? offerAd.model_ai || '' : '';
                 const offerStorage = extractStorage(offerAd.title + ' ' + offerAd.description) || extractStorage(offerModel);
 
-                // Storage capacity check - if both have storage info, they must match
                 if (demandStorage && offerStorage && demandStorage !== offerStorage) continue;
 
                 if (useAI) {
-                    if (demandModel && offerModel) {
+                    if (demandAd.parsed_embedding && offerAd.parsed_embedding) {
+                        const sim = cosineSimilarity(demandAd.parsed_embedding, offerAd.parsed_embedding);
+                        similarityScore = Math.round(sim * 100);
+                        
+                        let modelMatch = false;
+                        if (demandModel && offerModel) {
+                             modelMatch = demandModel.toLowerCase().includes(offerModel.split(' ')[0].toLowerCase()) ||
+                                offerModel.toLowerCase().includes(demandModel.split(' ')[0].toLowerCase());
+                        }
+
+                        isMatch = (similarityScore >= 80) || modelMatch;
+                        
+                        if (modelMatch && similarityScore < 100) {
+                            similarityScore = Math.min(100, similarityScore + 15);
+                        }
+                    } else if (demandModel && offerModel) {
                         isMatch = demandModel.toLowerCase().includes(offerModel.split(' ')[0].toLowerCase()) ||
                             offerModel.toLowerCase().includes(demandModel.split(' ')[0].toLowerCase());
                         similarityScore = isMatch ? 100 : 0;
@@ -392,15 +419,13 @@ app.post('/compare', async (req, res) => {
                         demand: demandAd
                     };
                     foundMatches.push(matchObj);
-
-                    // Save match to database
                     await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
                 }
             }
         }
 
         res.json({
-            message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered)' : '(Keyword Powered)'}`,
+            message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered Embeddings)' : '(Keyword Powered)'}`,
             data: foundMatches,
         });
 
