@@ -18,7 +18,6 @@ export const initDb = async () => {
     driver: sqlite3.Database
   });
 
-  // Zapnutí Write-Ahead Logging (WAL) módu pro zamezení zámkům databáze
   await db.exec('PRAGMA journal_mode = WAL;');
 
   await db.exec(`
@@ -52,7 +51,6 @@ export const initDb = async () => {
     );
   `);
 
-  // Migrace pro existující databáze - přidání sloupce embedding, pokud neexistuje
   try {
     const columnsInfo = await db.all("PRAGMA table_info(ads)");
     const hasEmbedding = columnsInfo.some(col => col.name === 'embedding');
@@ -112,6 +110,12 @@ export const getAllAds = async () => {
 export const getAllAdsByType = async (adType: string) => {
   const db = await initDb();
   return db.all('SELECT * FROM ads WHERE ad_type = ? ORDER BY scraped_at DESC LIMIT 1000', [adType]);
+};
+
+export const getRecentScrapedUrls = async (brand: string, adType: string, limit = 10): Promise<string[]> => {
+  const db = await initDb();
+  const rows = await db.all('SELECT url FROM ads WHERE brand = ? AND ad_type = ? ORDER BY scraped_at DESC LIMIT ?', [brand, adType, limit]);
+  return rows.map(r => r.url);
 };
 
 export const updateAdModelAi = async (id: string, model: string) => {
