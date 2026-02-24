@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls } from './database.js';
+import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,7 +93,7 @@ const BRANDS = [
     'Samsung', 'Apple', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi'
 ];
 
-const USER_AGENTS = [
+const USER_AGENTS: string[] = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
@@ -101,28 +101,77 @@ const USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
 ];
 
-const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)] ?? DEFAULT_USER_AGENT;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const firstToken = (value: string) => value.trim().split(/\s+/)[0] ?? '';
 
-const fetchPageWithRetry = async (url: string, retries = 3): Promise<any> => {
-    for (let attempt = 1; attempt <= retries; attempt++) {
+
+const proxyPool = (process.env.SCRAPER_PROXY_URLS || '')
+    .split(',')
+    .map((proxyUrl) => proxyUrl.trim())
+    .filter(Boolean);
+
+const getRandomProxy = () => {
+    if (proxyPool.length === 0) return undefined;
+    const url = proxyPool[Math.floor(Math.random() * proxyPool.length)];
+    if (!url) return undefined;
+
+    try {
+        const parsed = new URL(url);
+        const proxyConfig: { protocol: string; host: string; port: number; auth?: { username: string; password: string } } = {
+            protocol: parsed.protocol.replace(':', ''),
+            host: parsed.hostname,
+            port: Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)),
+        };
+
+        if (parsed.username) {
+            proxyConfig.auth = {
+                username: decodeURIComponent(parsed.username),
+                password: decodeURIComponent(parsed.password),
+            };
+        }
+
+        return proxyConfig;
+    } catch {
+        return undefined;
+    }
+};
+
+const scraperHttpClient = axios.create({ timeout: 30000 });
+
+const fetchPageWithRetry = async (url: string): Promise<any> => {
+    const maxRetries = 5;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            const delayMs = Math.floor(Math.random() * 2000) + 1500;
+            const delayMs = Math.floor(Math.random() * 2000) + 1200;
             await sleep(delayMs);
 
-            const response = await axios.get(url, {
-                timeout: 30000,
+            const proxy = getRandomProxy();
+            const requestConfig: { headers: Record<string, string>; proxy?: { protocol: string; host: string; port: number; auth?: { username: string; password: string } } } = {
                 headers: {
                     'User-Agent': getRandomUserAgent(),
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                     'Accept-Language': 'cs,cs-CZ;q=0.9,en;q=0.8'
-                }
-            });
+                },
+            };
+
+            if (proxy) {
+                requestConfig.proxy = proxy;
+            }
+
+            const response = await scraperHttpClient.get(url, requestConfig);
             return response;
         } catch (error: any) {
-            console.warn(`Pokus ${attempt} selhal pro ${url}: ${error.message}`);
-            if (attempt === retries) throw error;
-            await sleep(attempt * 3000);
+            const status = error?.response?.status as number | undefined;
+            const retryable = !status || status >= 500 || status === 429 || status === 408;
+            if (!retryable || attempt === maxRetries) {
+                throw error;
+            }
+
+            const backoff = Math.min(10000, 1200 * Math.pow(2, attempt - 1));
+            await sleep(backoff + Math.floor(Math.random() * 500));
         }
     }
 };
@@ -183,9 +232,11 @@ const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
     let normA = 0;
     let normB = 0;
     for (let i = 0; i < vecA.length; i++) {
-        dotProduct += vecA[i] * vecB[i];
-        normA += vecA[i] * vecA[i];
-        normB += vecB[i] * vecB[i];
+        const a = vecA[i] ?? 0;
+        const b = vecB[i] ?? 0;
+        dotProduct += a * b;
+        normA += a * a;
+        normB += b * b;
     }
     if (normA === 0 || normB === 0) return 0;
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
@@ -235,7 +286,12 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
     let hasNextPage = true;
     let pagesScraped = 0;
 
-    const recentUrls = await getRecentScrapedUrls(brand, adType, 10);
+    const recentUrls = await getRecentScrapedUrls(brand, adType, 25);
+    const checkpoint = await getScrapeCheckpoint(brand, adType);
+    const checkpointDate = checkpoint?.lastSeenDate ? parseDate(checkpoint.lastSeenDate) : null;
+    let latestSeenUrl: string | null = null;
+    let latestSeenDate: string | null = null;
+
     console.log(`Starting scrape for ${brand} (${adType}) at ${url}`);
 
     while (scrapedAds.length < 50 && hasNextPage && pagesScraped < 50) {
@@ -264,14 +320,31 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                     shouldStop = true;
                     break;
                 }
+
+                if (checkpointDate && adDate && adDate <= checkpointDate) {
+                    console.log(`Narazili jsme na inzerát starší nebo stejný jako checkpoint (${adDateStr}). Inkrementální scraping končí.`);
+                    shouldStop = true;
+                    break;
+                }
                 
                 const link = $(element).find(selectors.link).attr('href');
                 const fullLink = link && !link.startsWith('http') ? `${baseUrl}${link}` : link;
                 
+                if (fullLink && checkpoint?.lastSeenUrl && fullLink === checkpoint.lastSeenUrl) {
+                    console.log(`Dosažen uložený checkpoint URL pro ${brand}. Inkrementální scraping končí.`);
+                    shouldStop = true;
+                    break;
+                }
+
                 if (fullLink && recentUrls.includes(fullLink)) {
                     console.log(`Inzerát ${fullLink} již byl dříve stažen. Skript končí inkrementální stahování pro ${brand}.`);
                     shouldStop = true;
                     break;
+                }
+
+                if (!latestSeenUrl && fullLink) {
+                    latestSeenUrl = fullLink;
+                    latestSeenDate = adDateStr || null;
                 }
 
                 const adTitle = $(element).find(selectors.title).text().trim();
@@ -326,6 +399,10 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
 
     await fs.mkdir(outputDir, { recursive: true });
     await fs.writeFile(filePath, JSON.stringify(scrapedAds, null, 2));
+
+    if (latestSeenUrl || latestSeenDate) {
+        await updateScrapeCheckpoint(brand, adType, latestSeenUrl, latestSeenDate);
+    }
 
     console.log(`Successfully scraped ${scrapedAds.length} ads. Saved to ${filePath}`);
     return scrapedAds;
@@ -431,12 +508,22 @@ app.post('/compare', async (req, res) => {
             enrichedDemands.push(...allDemands);
         }
 
+        const useDatabaseVectorSearch = useAI && usingPostgres() && isPgVectorAvailable();
+
         for (const demandAd of enrichedDemands) {
             const demandPrice = parsePrice(demandAd.price);
             if (demandPrice === null) continue;
 
             const demandModel = useAI ? demandAd.model_ai || '' : '';
             const demandStorage = extractStorage(demandAd.title + ' ' + demandAd.description) || extractStorage(demandModel);
+            const pgSimilarityMap = new Map<string, number>();
+
+            if (useDatabaseVectorSearch) {
+                const similarRows = await getPgVectorSimilarities(demandAd.id, 0.75);
+                similarRows.forEach((row: { offer_id: string; similarity: number }) => {
+                    pgSimilarityMap.set(row.offer_id, Math.round(row.similarity * 100));
+                });
+            }
 
             for (const offerAd of enrichedOffers) {
                 if (demandAd.brand !== offerAd.brand) continue;
@@ -457,24 +544,36 @@ app.post('/compare', async (req, res) => {
                 if (demandStorage && offerStorage && demandStorage !== offerStorage) continue;
 
                 if (useAI) {
-                    if (demandAd.parsed_embedding && offerAd.parsed_embedding) {
-                        const sim = cosineSimilarity(demandAd.parsed_embedding, offerAd.parsed_embedding);
-                        similarityScore = Math.round(sim * 100);
-                        
+                    const dbSimilarity = pgSimilarityMap.get(offerAd.id);
+
+                    if (typeof dbSimilarity === 'number') {
+                        similarityScore = dbSimilarity;
+
                         let modelMatch = false;
                         if (demandModel && offerModel) {
-                             modelMatch = demandModel.toLowerCase().includes(offerModel.split(' ')[0].toLowerCase()) ||
-                                offerModel.toLowerCase().includes(demandModel.split(' ')[0].toLowerCase());
+                            modelMatch = demandModel.toLowerCase().includes(firstToken(offerModel).toLowerCase()) ||
+                                offerModel.toLowerCase().includes(firstToken(demandModel).toLowerCase());
+                        }
+
+                        isMatch = similarityScore >= 80 || modelMatch;
+                    } else if (demandAd.parsed_embedding && offerAd.parsed_embedding) {
+                        const sim = cosineSimilarity(demandAd.parsed_embedding, offerAd.parsed_embedding);
+                        similarityScore = Math.round(sim * 100);
+
+                        let modelMatch = false;
+                        if (demandModel && offerModel) {
+                            modelMatch = demandModel.toLowerCase().includes(firstToken(offerModel).toLowerCase()) ||
+                                offerModel.toLowerCase().includes(firstToken(demandModel).toLowerCase());
                         }
 
                         isMatch = (similarityScore >= 80) || modelMatch;
-                        
+
                         if (modelMatch && similarityScore < 100) {
                             similarityScore = Math.min(100, similarityScore + 15);
                         }
                     } else if (demandModel && offerModel) {
-                        isMatch = demandModel.toLowerCase().includes(offerModel.split(' ')[0].toLowerCase()) ||
-                            offerModel.toLowerCase().includes(demandModel.split(' ')[0].toLowerCase());
+                        isMatch = demandModel.toLowerCase().includes(firstToken(offerModel).toLowerCase()) ||
+                            offerModel.toLowerCase().includes(firstToken(demandModel).toLowerCase());
                         similarityScore = isMatch ? 100 : 0;
                     }
                 } else {
