@@ -451,9 +451,78 @@ app.post('/scrape-all', async (req, res) => {
     }
 });
 
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const daysSincePosted = (dateStr: string): number => {
+    const parsed = parseDate(dateStr);
+    if (!parsed) return 14;
+    const now = new Date();
+    return Math.max(0, Math.floor((now.getTime() - parsed.getTime()) / (1000 * 60 * 60 * 24)));
+};
+
+const computeOpportunityScore = (profit: number, similarityScore: number, demandDateStr: string, offerDateStr: string): number => {
+    const profitScore = clamp((profit / 8000) * 100, 0, 100);
+    const freshnessDemand = clamp(100 - daysSincePosted(demandDateStr) * 5, 20, 100);
+    const freshnessOffer = clamp(100 - daysSincePosted(offerDateStr) * 5, 20, 100);
+    const weighted = (profitScore * 0.45) + (similarityScore * 0.35) + ((freshnessDemand + freshnessOffer) / 2 * 0.20);
+    return Math.round(clamp(weighted, 0, 100));
+};
+
+const computeRealOpportunityScore = (profit: number, demandPrice: number, offerPrice: number, similarityScore: number, demandDateStr: string, offerDateStr: string): number => {
+    const netProfitScore = clamp(((profit - 400) / 7000) * 100, 0, 100);
+    const margin = demandPrice > 0 ? ((demandPrice - offerPrice) / demandPrice) * 100 : 0;
+    const marginScore = clamp(margin * 2.2, 0, 100);
+    const freshnessDemand = clamp(100 - daysSincePosted(demandDateStr) * 6, 10, 100);
+    const freshnessOffer = clamp(100 - daysSincePosted(offerDateStr) * 6, 10, 100);
+    const weighted = (netProfitScore * 0.35) + (similarityScore * 0.30) + (marginScore * 0.20) + (((freshnessDemand + freshnessOffer) / 2) * 0.15);
+    return Math.round(clamp(weighted, 0, 100));
+};
+
+app.post('/alerts/notify', async (req, res) => {
+    try {
+        const { telegramBotToken, telegramChatId, emailWebhookUrl, matches = [] } = req.body;
+        const topMatches = Array.isArray(matches) ? matches.slice(0, 5) : [];
+        const summary = topMatches
+            .map((m: any, idx: number) => `${idx + 1}. ${m.offer?.title || 'N/A'} → ${m.arbitrageScore || 0} Kč (Opportunity ${m.opportunityScore || 0})`)
+            .join('\n');
+        const message = `📈 Bazoš alert: nové TOP příležitosti\n${summary || 'Žádné nové položky.'}`;
+
+        const results: { telegram?: string; email?: string } = {};
+
+        if (telegramBotToken && telegramChatId) {
+            const tgRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: telegramChatId, text: message }),
+            });
+            results.telegram = tgRes.ok ? 'sent' : `failed (${tgRes.status})`;
+        }
+
+        if (emailWebhookUrl) {
+            const emailRes = await fetch(emailWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    subject: 'Bazoš alert – nové ziskové příležitosti',
+                    text: message,
+                    matches: topMatches,
+                }),
+            });
+            results.email = emailRes.ok ? 'sent' : `failed (${emailRes.status})`;
+        }
+
+        res.json({ message: 'Alert processing finished', results });
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Alert failed', error: errorMessage });
+    }
+});
+
 app.post('/compare', async (req, res) => {
     try {
         const foundMatches: any[] = [];
+        const seenMatches = new Set<string>();
         const comparisonMethod = req.body.comparisonMethod || 'auto';
         
         let useAI = false;
@@ -583,10 +652,21 @@ app.post('/compare', async (req, res) => {
                 }
 
                 if (isMatch) {
+                    const dedupKey = `${offerAd.url || offerAd.id}__${demandAd.url || demandAd.id}`;
+                    if (seenMatches.has(dedupKey)) continue;
+                    seenMatches.add(dedupKey);
+
+                    const arbitrageScore = demandPrice - offerPrice;
+                    const opportunityScore = computeOpportunityScore(arbitrageScore, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '');
+                    const realOpportunityScore = computeRealOpportunityScore(arbitrageScore, demandPrice, offerPrice, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '');
+
                     const matchObj = {
                         offer: { ...offerAd, similarity: similarityScore, ai: useAI },
                         demand: demandAd,
-                        arbitrageScore: demandPrice - offerPrice // Výpočet hrubého zisku
+                        arbitrageScore,
+                        opportunityScore,
+                        realOpportunityScore,
+                        expectedNetProfit: Math.max(0, Math.round(arbitrageScore - 400)),
                     };
                     foundMatches.push(matchObj);
                     await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
@@ -595,7 +675,7 @@ app.post('/compare', async (req, res) => {
         }
 
         // Seřazení výsledků od nejvyššího potenciálního zisku (arbitrážního skóre)
-        foundMatches.sort((a, b) => b.arbitrageScore - a.arbitrageScore);
+        foundMatches.sort((a, b) => (b.realOpportunityScore - a.realOpportunityScore) || (b.arbitrageScore - a.arbitrageScore));
 
         res.json({
             message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered Embeddings)' : '(Keyword Powered)'}`,

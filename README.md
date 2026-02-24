@@ -1,5 +1,26 @@
 # Český Inzertní Scraper UI (Bazoš Arbitráž)
 
+Aplikace pro **scraping inzerátů**, jejich porovnávání (nabídka vs. poptávka) a hledání arbitrážních příležitostí.
+
+---
+
+## 1) Rychlý start (nejjednodušší varianta)
+
+> Doporučeno pro začátek: **SQLite + bez proxy + volitelně Ollama**.
+
+### Krok 1: Instalace Node.js
+- Nainstalujte Node.js (doporučeno LTS, min. v18).
+- Ověřte:
+
+```bash
+node -v
+npm -v
+```
+
+### Krok 2: Instalace závislostí
+
+```bash
+# root projektu
 Webová aplikace pro scrapování, ukládání a porovnávání inzerátů mobilních telefonů (nabídka vs. poptávka) z Bazoš.cz. Cíl je najít arbitrážní příležitosti (koupit levněji, prodat dráž) a rovnou ukázat potenciální zisk.
 
 ---

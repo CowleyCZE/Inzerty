@@ -9,7 +9,7 @@ interface MatchMeta {
 }
 
 interface ResultsDisplayProps {
-  matchedAds: { offer: Ad; demand: Ad; arbitrageScore?: number }[];
+  matchedAds: MatchItem[];
   isLoading?: boolean;
 }
 
@@ -58,11 +58,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
   if (!matchedAds || matchedAds.length === 0) {
     return (
       <div className="bg-slate-800 p-8 rounded-xl shadow-2xl mt-8 text-center border border-slate-700">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto text-slate-500 mb-4">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
         <p className="text-xl text-slate-300">Zatím nebyly nalezeny žádné shody.</p>
-        <p className="text-slate-500 mt-2">Spusťte porovnávání pro analýzu inzerátů.</p>
       </div>
     );
   }
@@ -85,15 +81,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
         
         <div className="flex flex-wrap items-center gap-3 bg-slate-900 p-2 rounded-lg border border-slate-700">
           <label htmlFor="minProfit" className="text-sm font-medium text-slate-300">Minimální zisk:</label>
-          <input
-            type="number"
-            id="minProfit"
-            value={minProfit}
-            onChange={(e) => setMinProfit(Number(e.target.value))}
-            className="w-24 bg-slate-700 border border-slate-600 text-emerald-400 font-bold rounded p-1 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-            step="500"
-            min="0"
-          />
+          <input type="number" id="minProfit" value={minProfit} onChange={(e) => setMinProfit(Number(e.target.value))} className="w-24 bg-slate-700 border border-slate-600 text-emerald-400 font-bold rounded p-1 text-sm" step="500" min="0" />
           <span className="text-slate-400 text-sm">Kč</span>
 
           <label htmlFor="sortOrder" className="text-sm font-medium text-slate-300 ml-2">Řazení:</label>
