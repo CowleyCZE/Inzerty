@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch } from './database.js';
+import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +15,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = 3001;
 
-// Konfigurace URL pro Ollamu - umožní běh přes síť (např. z Termuxu na PC)
 const OLLAMA_BASE_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const isLocalOllama = OLLAMA_BASE_URL.includes('localhost') || OLLAMA_BASE_URL.includes('127.0.0.1');
 
@@ -236,6 +235,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
     let hasNextPage = true;
     let pagesScraped = 0;
 
+    const recentUrls = await getRecentScrapedUrls(brand, adType, 10);
     console.log(`Starting scrape for ${brand} (${adType}) at ${url}`);
 
     while (scrapedAds.length < 50 && hasNextPage && pagesScraped < 50) {
@@ -264,7 +264,16 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                     shouldStop = true;
                     break;
                 }
+                
                 const link = $(element).find(selectors.link).attr('href');
+                const fullLink = link && !link.startsWith('http') ? `${baseUrl}${link}` : link;
+                
+                if (fullLink && recentUrls.includes(fullLink)) {
+                    console.log(`Inzerát ${fullLink} již byl dříve stažen. Skript končí inkrementální stahování pro ${brand}.`);
+                    shouldStop = true;
+                    break;
+                }
+
                 const adTitle = $(element).find(selectors.title).text().trim();
                 const adDescription = $(element).find(selectors.description).text().trim();
 
@@ -272,7 +281,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                     id: randomUUID(),
                     title: adTitle,
                     price: $(element).find(selectors.price).text().trim(),
-                    link: link && !link.startsWith('http') ? `${baseUrl}${link}` : link,
+                    link: fullLink,
                     date_posted: adDateStr,
                     brand: brand,
                     ad_type: adType,
@@ -367,8 +376,17 @@ app.post('/scrape-all', async (req, res) => {
 
 app.post('/compare', async (req, res) => {
     try {
-        const foundMatches: { offer: any, demand: any }[] = [];
-        const useAI = await checkOllamaStatus();
+        const foundMatches: any[] = [];
+        const comparisonMethod = req.body.comparisonMethod || 'auto';
+        
+        let useAI = false;
+        if (comparisonMethod === 'ollama') {
+            useAI = await checkOllamaStatus();
+        } else if (comparisonMethod === 'auto') {
+            useAI = await checkOllamaStatus();
+        } else if (comparisonMethod === 'local-keyword') {
+            useAI = false;
+        }
 
         const allOffers = await getAllAdsByType('nabidka');
         const allDemands = await getAllAdsByType('poptavka');
@@ -468,13 +486,17 @@ app.post('/compare', async (req, res) => {
                 if (isMatch) {
                     const matchObj = {
                         offer: { ...offerAd, similarity: similarityScore, ai: useAI },
-                        demand: demandAd
+                        demand: demandAd,
+                        arbitrageScore: demandPrice - offerPrice // Výpočet hrubého zisku
                     };
                     foundMatches.push(matchObj);
                     await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
                 }
             }
         }
+
+        // Seřazení výsledků od nejvyššího potenciálního zisku (arbitrážního skóre)
+        foundMatches.sort((a, b) => b.arbitrageScore - a.arbitrageScore);
 
         res.json({
             message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered Embeddings)' : '(Keyword Powered)'}`,
