@@ -18,6 +18,9 @@ export const initDb = async () => {
     driver: sqlite3.Database
   });
 
+  // Zapnutí Write-Ahead Logging (WAL) módu pro zamezení zámkům databáze
+  await db.exec('PRAGMA journal_mode = WAL;');
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS ads (
       id TEXT PRIMARY KEY,
@@ -32,7 +35,8 @@ export const initDb = async () => {
       ad_type TEXT,
       brand TEXT,
       scraped_at TEXT,
-      model_ai TEXT
+      model_ai TEXT,
+      embedding TEXT
     );
 
     CREATE TABLE IF NOT EXISTS matches (
@@ -48,6 +52,17 @@ export const initDb = async () => {
     );
   `);
 
+  // Migrace pro existující databáze - přidání sloupce embedding, pokud neexistuje
+  try {
+    const columnsInfo = await db.all("PRAGMA table_info(ads)");
+    const hasEmbedding = columnsInfo.some(col => col.name === 'embedding');
+    if (!hasEmbedding) {
+      await db.exec("ALTER TABLE ads ADD COLUMN embedding TEXT;");
+    }
+  } catch (e) {
+    console.error('Migration error:', e);
+  }
+
   console.log('Database initialized at', dbPath);
   return db;
 };
@@ -55,14 +70,13 @@ export const initDb = async () => {
 export const saveAd = async (ad: any) => {
   const db = await initDb();
 
-  // Clean price for storage
   const rawPrice = ad.price ? parseFloat(ad.price.replace(/[^0-9,-]+/g, '').replace(',', '.')) : null;
   const safePriceValue = rawPrice !== null && !isNaN(rawPrice) ? rawPrice : null;
 
   try {
     await db.run(
-      `INSERT OR IGNORE INTO ads (id, title, price, price_value, location, description, date_posted, url, image_url, ad_type, brand, scraped_at, model_ai)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO ads (id, title, price, price_value, location, description, date_posted, url, image_url, ad_type, brand, scraped_at, model_ai, embedding)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         ad.id,
         ad.title,
@@ -71,15 +85,15 @@ export const saveAd = async (ad: any) => {
         ad.location,
         ad.description,
         ad.date_posted,
-        ad.link, // using 'link' from scraper as 'url'
+        ad.link,
         ad.image_url || '',
         ad.ad_type,
         ad.brand,
         ad.scraped_at,
-        '' // model_ai initially empty
+        '',
+        null
       ]
     );
-    // If we wanted to update existing ads, we'd use ON CONFLICT(url) DO UPDATE ...
   } catch (error) {
     console.error('Error saving ad:', error);
   }
@@ -103,6 +117,11 @@ export const getAllAdsByType = async (adType: string) => {
 export const updateAdModelAi = async (id: string, model: string) => {
   const db = await initDb();
   await db.run('UPDATE ads SET model_ai = ? WHERE id = ?', [model, id]);
+};
+
+export const updateAdEmbedding = async (id: string, embedding: string) => {
+  const db = await initDb();
+  await db.run('UPDATE ads SET embedding = ? WHERE id = ?', [embedding, id]);
 };
 
 export const saveMatch = async (offerId: string, demandId: string, score: number, isAi: boolean) => {
