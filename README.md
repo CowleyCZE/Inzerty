@@ -21,6 +21,48 @@ npm -v
 
 ```bash
 # root projektu
+Webová aplikace pro scrapování, ukládání a porovnávání inzerátů mobilních telefonů (nabídka vs. poptávka) z Bazoš.cz. Cíl je najít arbitrážní příležitosti (koupit levněji, prodat dráž) a rovnou ukázat potenciální zisk.
+
+---
+
+- **Inkrementální scraping**
+  - scraper ukládá checkpointy (`brand + ad_type`) a při dalším běhu stahuje jen nové inzeráty,
+  - umí se zastavit na posledním známém URL a/nebo datu,
+  - omezuje zbytečné requesty při častém spouštění.
+
+- **Spolehlivější scraping**
+  - rotace `User-Agent`,
+  - náhodné zpoždění mezi požadavky,
+  - retry + exponenciální backoff + jitter pro `429/5xx/408` a síťové chyby,
+  - volitelná proxy rotace přes `SCRAPER_PROXY_URLS`.
+
+- **Porovnání inzerátů (AI / bez AI)**
+  - lokální keyword režim,
+  - AI režim přes Ollama (`llama3.2:1b`) s embeddingy,
+  - auto režim podle dostupnosti Ollama.
+
+- **Arbitrážní skóre**
+  - backend počítá `arbitrageScore = demandPrice - offerPrice`,
+  - frontend umí filtrovat minimální zisk a řadit výsledky podle výnosnosti.
+
+- **Škálování přes PostgreSQL + pgvector (volitelné)**
+  - výchozí režim: SQLite,
+  - volitelně `DB_CLIENT=postgres` + `DATABASE_URL`,
+  - při dostupném `pgvector` se podobnost umí počítat přímo v DB.
+
+## Technologie
+
+- **Frontend:** React 19, TypeScript, Vite
+- **Backend:** Node.js, Express, Axios, Cheerio
+- **DB:** SQLite (default), PostgreSQL (volitelně)
+- **AI:** Ollama
+
+## Instalace
+
+### 1) Závislosti
+
+```bash
+# root (frontend)
 npm install
 
 # backend
@@ -28,193 +70,51 @@ cd backend
 npm install
 ```
 
-### Krok 3: Spuštění backendu
+## Spuštění
+
+### Backend
 
 ```bash
 cd backend
 npm start
+# běží na http://localhost:3001
 ```
 
-Backend poběží na `http://localhost:3001`.
+> `npm start` je nyní dostupný a spouští backend server.
 
-### Krok 4: Spuštění frontendu
+### Frontend
 
 ```bash
 # v rootu projektu
 npm run dev
+# běží na http://localhost:5173
 ```
 
-Frontend poběží na `http://localhost:5173`.
+## Konfigurace (backend env)
 
----
+### Výchozí (SQLite)
 
-## 2) Ollama – kompletní step-by-step
+Není potřeba nic nastavovat. Použije se soubor `backend/inzerty.db`.
 
-### Instalace Ollama
-- Web: https://ollama.com/download
-- Nainstalujte podle OS (Windows/macOS/Linux).
-
-### Výběr modelu
-Doporučeno začít modelem:
-- `llama3.2:1b` (rychlý, nízké nároky)
-
-Případně kvalitnější, ale náročnější:
-- `llama3.1:8b`
-- `mistral:7b`
-
-### Stažení modelu
+### Volitelně PostgreSQL
 
 ```bash
-ollama pull llama3.2:1b
-```
-
-### Spuštění Ollama serveru
-
-```bash
-ollama serve
-```
-
-### Nastavení backendu na Ollama endpoint
-
-```bash
-# Linux/macOS
-export OLLAMA_URL="http://localhost:11434"
-
-# Windows PowerShell
-$env:OLLAMA_URL="http://localhost:11434"
-```
-
-### Zapnutí AI v aplikaci
-- V horní liště klikněte na přepínač **AI Server ON/OFF**.
-- V porovnání použijte AI/Auto režim.
-
-### Vypnutí Ollama
-- V aplikaci přepnout na **OFF**, nebo
-- v terminálu ukončit proces `ollama serve` (`Ctrl+C`).
-
----
-
-## 3) PostgreSQL – kompletní step-by-step
-
-> PostgreSQL je vhodné pro větší data a budoucí škálování.
-
-### Instalace PostgreSQL
-- Windows: použijte oficiální installer (postgresql.org)
-- Linux: přes balíčkovací systém (apt/yum/pacman)
-
-### Vytvoření DB (příklad)
-
-```sql
-CREATE DATABASE inzerty;
-```
-
-### Nastavení připojení
-
-```bash
-# Linux/macOS
 export DB_CLIENT=postgres
 export DATABASE_URL="postgresql://postgres:heslo@localhost:5432/inzerty"
-
-# Windows PowerShell
-$env:DB_CLIENT="postgres"
-$env:DATABASE_URL="postgresql://postgres:heslo@localhost:5432/inzerty"
 ```
 
-### Spuštění backendu
+### Ollama
 
 ```bash
-cd backend
-npm start
+export OLLAMA_URL="http://localhost:11434"
 ```
 
-Backend si tabulky vytvoří automaticky při startu.
-
-### pgvector (volitelně)
-Pokud chcete DB výpočty vektorové podobnosti:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
-Aplikace se pokusí pgvector aktivovat automaticky; když není dostupný, použije fallback v Node.js.
-
----
-
-## 4) Proxy pool pro scraper – step-by-step
-
-> Proxy jsou volitelné. Hodí se při častém scrapingu.
-
-### Kde získat proxy
-Běžný postup:
-1. Registrace u proxy providera (např. datacenter/residential).
-2. Vygenerování endpointů (IP:PORT, případně user/pass).
-3. Otestování endpointů mimo aplikaci (curl, browser, script).
-
-### Nastavení v aplikaci
-Do proměnné `SCRAPER_PROXY_URLS` zadejte více proxy oddělených čárkou:
+### Proxy pool pro scraper (volitelné)
 
 ```bash
-# Linux/macOS
-export SCRAPER_PROXY_URLS="http://user:pass@proxy1:8080,http://user:pass@proxy2:8080"
-
-# Windows PowerShell
-$env:SCRAPER_PROXY_URLS="http://user:pass@proxy1:8080,http://user:pass@proxy2:8080"
+export SCRAPER_PROXY_URLS="http://user:pass@proxy1:8080,http://proxy2:8080"
 ```
 
-Scraper proxy rotuje náhodně mezi požadavky.
+## Poznámka
 
----
-
-## 5) Jak uživateli co nejvíce ulehčit nastavení
-
-Aplikace obsahuje stránku **Nastavení**:
-- přepnutí SQLite/PostgreSQL,
-- vyplnění Ollama URL + modelu,
-- zapnutí/vypnutí proxy poolu,
-- generátor `.env` hodnot k okamžitému zkopírování.
-
-Doporučený postup pro běžného uživatele:
-1. Nechat SQLite.
-2. Spustit `ollama serve` + model `llama3.2:1b`.
-3. Proxy nechat vypnuté.
-4. Spustit scraping a následně comparison.
-
----
-
-## 6) Co aplikace aktuálně umí
-
-- Inkrementální scraping (checkpoint URL + datum).
-- Retry/backoff + jitter + anti-bot prvky.
-- Výpočet arbitrážního skóre.
-- Řazení/filtrování výsledků na frontendu.
-- Volitelný PostgreSQL režim s přípravou na pgvector.
-
----
-
-## 7) Troubleshooting
-
-### Chyba: `npm start` v backendu nefunguje
-Ujistěte se, že jste ve složce `backend` a že máte aktuální verzi repozitáře.
-
-```bash
-cd backend
-npm install
-npm start
-```
-
-### Chyba: `table ads has no column named embedding`
-Byla opravena migrací při startu backendu (automatické doplnění chybějících sloupců). Pokud máte velmi starou DB, stačí restart backendu.
-
-### Ollama nereaguje
-- Ověřte běh `ollama serve`.
-- Zkontrolujte `OLLAMA_URL`.
-- Otestujte endpoint: `http://localhost:11434/api/tags`.
-
----
-
-## 8) Etika a právní rámec
-
-Scrapujte ohleduplně:
-- nepřetěžujte cílové servery,
-- respektujte podmínky webu,
-- nepracujte s citlivými daty bez právního důvodu.
+Scrapování cizích webů provádějte ohleduplně a s rozumnou frekvencí.
