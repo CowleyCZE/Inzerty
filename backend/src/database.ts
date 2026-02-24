@@ -47,30 +47,6 @@ const getPgPool = () => {
 
 export const usingPostgres = () => DB_CLIENT === 'postgres';
 
-
-const ensureSqliteColumn = async (db: Database, tableName: string, columnName: string, columnDefinition: string) => {
-  const columns = await db.all<Array<{ name: string }>>(`PRAGMA table_info(${tableName})`);
-  const exists = columns.some((column) => column.name === columnName);
-  if (!exists) {
-    await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
-  }
-};
-
-const runSqliteMigrations = async (db: Database) => {
-  await ensureSqliteColumn(db, 'ads', 'price_value', 'REAL');
-  await ensureSqliteColumn(db, 'ads', 'location', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'description', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'date_posted', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'url', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'image_url', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'ad_type', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'brand', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'scraped_at', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'model_ai', 'TEXT');
-  await ensureSqliteColumn(db, 'ads', 'embedding', 'TEXT');
-};
-
-
 export const initDb = async () => {
   if (isInitialized) return;
 
@@ -170,8 +146,6 @@ export const initDb = async () => {
         PRIMARY KEY (brand, ad_type)
       );
   `);
-
-  await runSqliteMigrations(db);
   isInitialized = true;
   console.log('SQLite database initialized');
 };

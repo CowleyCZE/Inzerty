@@ -46,25 +46,6 @@ const loadInitialMeta = (): Record<string, MatchMeta> => {
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }) => {
   const [minProfit, setMinProfit] = useState<number>(0);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [hideResolved, setHideResolved] = useState<boolean>(false);
-  const [metaByMatch, setMetaByMatch] = useState<Record<string, MatchMeta>>(() => loadInitialMeta());
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(metaByMatch));
-  }, [metaByMatch]);
-
-  const updateMatchMeta = (key: string, partial: Partial<MatchMeta>) => {
-    setMetaByMatch((prev) => {
-      const current = prev[key] || { status: 'new', note: '' };
-      return {
-        ...prev,
-        [key]: {
-          ...current,
-          ...partial,
-        },
-      };
-    });
-  };
 
   if (isLoading) {
     return (
@@ -86,18 +67,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
     );
   }
 
-  const filteredMatches = useMemo(() => {
-    return matchedAds
-      .filter((match) => (match.arbitrageScore || 0) >= minProfit)
-      .filter((match) => {
-        if (!hideResolved) return true;
-        const key = getMatchKey(match.offer, match.demand);
-        return (metaByMatch[key]?.status || 'new') !== 'closed';
-      })
-      .sort((a, b) => sortOrder === 'desc'
-        ? (b.arbitrageScore || 0) - (a.arbitrageScore || 0)
-        : (a.arbitrageScore || 0) - (b.arbitrageScore || 0));
-  }, [matchedAds, minProfit, sortOrder, hideResolved, metaByMatch]);
+  const filteredMatches = matchedAds
+    .filter(match => (match.arbitrageScore || 0) >= minProfit)
+    .sort((a, b) => sortOrder === 'desc'
+      ? (b.arbitrageScore || 0) - (a.arbitrageScore || 0)
+      : (a.arbitrageScore || 0) - (b.arbitrageScore || 0));
 
   return (
     <div className="bg-slate-800 p-6 rounded-xl shadow-2xl mt-8 border border-slate-700">
@@ -108,7 +82,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
           </svg>
           Akční fronta arbitrážních příležitostí ({filteredMatches.length})
         </h2>
-
+        
         <div className="flex flex-wrap items-center gap-3 bg-slate-900 p-2 rounded-lg border border-slate-700">
           <label htmlFor="minProfit" className="text-sm font-medium text-slate-300">Minimální zisk:</label>
           <input
@@ -132,15 +106,6 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
             <option value="desc">Nejvyšší zisk</option>
             <option value="asc">Nejnižší zisk</option>
           </select>
-
-          <label className="inline-flex items-center gap-2 text-sm text-slate-300 ml-1">
-            <input
-              type="checkbox"
-              checked={hideResolved}
-              onChange={(e) => setHideResolved(e.target.checked)}
-            />
-            Skrýt vyřešené
-          </label>
         </div>
       </div>
 
