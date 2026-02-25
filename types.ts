@@ -12,6 +12,42 @@ export interface Ad {
   scraped_at: string;
   views: string;
   is_top: boolean;
+  link?: string;
+  similarity?: number;
+  ai?: boolean;
+}
+
+export type MatchStatus = 'new' | 'review' | 'contacted' | 'negotiation' | 'closed';
+export type MatchPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface DueDiligenceChecklist {
+  imeiVerified: boolean;
+  batteryHealthChecked: boolean;
+  displayChecked: boolean;
+  accessoriesChecked: boolean;
+  warrantyProofChecked: boolean;
+}
+
+export interface MatchMeta {
+  status: MatchStatus;
+  note: string;
+  priority: MatchPriority;
+  lastActionAt: string;
+  resolved: boolean;
+  followUpAt: string;
+  followUpState: 'none' | 'waiting' | 'no_response' | 'done';
+  checklist: DueDiligenceChecklist;
+}
+
+export interface MatchItem {
+  offer: Ad;
+  demand: Ad;
+  arbitrageScore?: number;
+  opportunityScore?: number;
+  realOpportunityScore?: number;
+  expectedNetProfit?: number;
+  locationScore?: number;
+  priceTrustScore?: number;
 }
 
 export interface Config {
@@ -19,12 +55,22 @@ export interface Config {
   adType: string;
   itemCount: number;
   url: string;
+  comparisonMethod?: string;
+  filterRules?: {
+    blacklistTerms: string[];
+    whitelistModels: string[];
+    minPrice: number | null;
+    maxPrice: number | null;
+    minStorageGb: number | null;
+  };
   selectors: {
     item: string;
     title: string;
     price: string;
     date: string;
     link: string;
+    description?: string;
+    location?: string;
   };
 }
 

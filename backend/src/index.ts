@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities } from './database.js';
+import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities, saveMatchMeta, getResolvedMatchKeys, getDailyMetaStats } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +26,36 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 let ollamaProcess: ChildProcess | null = null;
 let isOllamaRunning = false;
+
+type RuntimeLogEntry = {
+    id: string;
+    timestamp: string;
+    message: string;
+    type: 'info' | 'success' | 'error' | 'system';
+};
+
+const runtimeLogs: RuntimeLogEntry[] = [];
+const MAX_RUNTIME_LOGS = 500;
+
+const pushRuntimeLog = (message: string, type: RuntimeLogEntry['type'] = 'info') => {
+    const entry: RuntimeLogEntry = {
+        id: randomUUID(),
+        timestamp: new Date().toLocaleTimeString('cs-CZ'),
+        message,
+        type,
+    };
+    runtimeLogs.push(entry);
+    if (runtimeLogs.length > MAX_RUNTIME_LOGS) {
+        runtimeLogs.splice(0, runtimeLogs.length - MAX_RUNTIME_LOGS);
+    }
+
+    if (type === 'error') {
+        console.error(`[${entry.timestamp}] ${message}`);
+    } else {
+        console.log(`[${entry.timestamp}] ${message}`);
+    }
+};
+
 
 const checkOllamaStatus = async () => {
     try {
@@ -87,6 +117,16 @@ app.post('/ollama/toggle', async (req, res) => {
 app.get('/ollama/status', async (req, res) => {
     const running = await checkOllamaStatus();
     res.json({ status: running });
+});
+
+
+app.get('/logs', (req, res) => {
+    res.json({ logs: runtimeLogs.slice(-200) });
+});
+
+app.post('/logs/clear', (req, res) => {
+    runtimeLogs.length = 0;
+    res.json({ message: 'Logs cleared' });
 });
 
 const BRANDS = [
@@ -292,10 +332,10 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
     let latestSeenUrl: string | null = null;
     let latestSeenDate: string | null = null;
 
-    console.log(`Starting scrape for ${brand} (${adType}) at ${url}`);
+    pushRuntimeLog(`Starting scrape for ${brand} (${adType}) at ${url}`, 'system');
 
     while (scrapedAds.length < 50 && hasNextPage && pagesScraped < 50) {
-        console.log(`Scraping page: ${currentPageUrl}`);
+        pushRuntimeLog(`Scraping page: ${currentPageUrl}`);
         pagesScraped++;
 
         try {
@@ -306,7 +346,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
 
             const items = $(selectors.item);
             if (items.length === 0) {
-                console.log('No items found on page. Stopping.');
+                pushRuntimeLog('No items found on page. Stopping.', 'system');
                 break;
             }
 
@@ -316,13 +356,13 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 const adDate = parseDate(adDateStr);
 
                 if (adDate && adDate < twoMonthsAgo) {
-                    console.log(`Found ad older than 2 months (${adDateStr}). Stopping.`);
+                    pushRuntimeLog(`Found ad older than 2 months (${adDateStr}). Stopping.`, 'system');
                     shouldStop = true;
                     break;
                 }
 
                 if (checkpointDate && adDate && adDate <= checkpointDate) {
-                    console.log(`Narazili jsme na inzerát starší nebo stejný jako checkpoint (${adDateStr}). Inkrementální scraping končí.`);
+                    pushRuntimeLog(`Narazili jsme na inzerát starší nebo stejný jako checkpoint (${adDateStr}). Inkrementální scraping končí.`, 'system');
                     shouldStop = true;
                     break;
                 }
@@ -331,13 +371,13 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 const fullLink = link && !link.startsWith('http') ? `${baseUrl}${link}` : link;
                 
                 if (fullLink && checkpoint?.lastSeenUrl && fullLink === checkpoint.lastSeenUrl) {
-                    console.log(`Dosažen uložený checkpoint URL pro ${brand}. Inkrementální scraping končí.`);
+                    pushRuntimeLog(`Dosažen uložený checkpoint URL pro ${brand}. Inkrementální scraping končí.`, 'system');
                     shouldStop = true;
                     break;
                 }
 
                 if (fullLink && recentUrls.includes(fullLink)) {
-                    console.log(`Inzerát ${fullLink} již byl dříve stažen. Skript končí inkrementální stahování pro ${brand}.`);
+                    pushRuntimeLog(`Inzerát ${fullLink} již byl dříve stažen. Skript končí inkrementální stahování pro ${brand}.`, 'system');
                     shouldStop = true;
                     break;
                 }
@@ -372,7 +412,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 scrapedAds.push(ad);
 
                 if (scrapedAds.length >= 50) {
-                    console.log('Reached 50 ads limit. Stopping.');
+                    pushRuntimeLog('Reached 50 ads limit. Stopping.', 'system');
                     shouldStop = true;
                     break;
                 }
@@ -385,7 +425,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 currentPageUrl = new URL(nextPageLink, baseUrl).href;
             } else {
                 hasNextPage = false;
-                console.log('No next page link found. Stopping.');
+                pushRuntimeLog('No next page link found. Stopping.', 'system');
             }
         } catch (error) {
             console.error(`Scraping failed completely for ${currentPageUrl} after retries. Preskakuji stránku.`);
@@ -404,7 +444,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
         await updateScrapeCheckpoint(brand, adType, latestSeenUrl, latestSeenDate);
     }
 
-    console.log(`Successfully scraped ${scrapedAds.length} ads. Saved to ${filePath}`);
+    pushRuntimeLog(`Successfully scraped ${scrapedAds.length} ads. Saved to ${filePath}`, 'success');
     return scrapedAds;
 }
 
@@ -421,7 +461,7 @@ app.post('/scrape-all', async (req, res) => {
         let totalPoptavka = 0;
 
         for (const brand of BRANDS) {
-            console.log(`Scraping offers for ${brand}`);
+            pushRuntimeLog(`Scraping offers for ${brand}`, 'system');
             let brandUrlSegment = brand.toLowerCase().replace(/ /g, '-');
             if (brand === 'Sony') {
                 brandUrlSegment = 'ericsson';
@@ -433,7 +473,7 @@ app.post('/scrape-all', async (req, res) => {
             scrapedData.nabidka.push(...offerAds);
             totalNabidka += offerAds.length;
 
-            console.log(`Scraping demands for ${brand}`);
+            pushRuntimeLog(`Scraping demands for ${brand}`, 'system');
             const demandAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'poptavka', selectors);
             scrapedData.poptavka.push(...demandAds);
             totalPoptavka += demandAds.length;
@@ -445,6 +485,7 @@ app.post('/scrape-all', async (req, res) => {
         });
 
     } catch (error) {
+pushRuntimeLog(`Scraping error: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
         console.error('An error occurred during scraping:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         res.status(500).json({ message: 'An error occurred during scraping.', error: errorMessage });
@@ -453,6 +494,35 @@ app.post('/scrape-all', async (req, res) => {
 
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const normalizeText = (value: string) => (value || '').toLowerCase();
+
+const locationSimilarity = (demandLocation: string, offerLocation: string) => {
+    const a = normalizeText(demandLocation).trim();
+    const b = normalizeText(offerLocation).trim();
+    if (!a || !b) return 55;
+    if (a === b) return 100;
+    const tokenA = new Set(a.split(/[\s,.-]+/).filter(Boolean));
+    const tokenB = new Set(b.split(/[\s,.-]+/).filter(Boolean));
+    let inter = 0;
+    tokenA.forEach((t) => { if (tokenB.has(t)) inter += 1; });
+    const denom = Math.max(1, Math.max(tokenA.size, tokenB.size));
+    return Math.round(clamp((inter / denom) * 100, 35, 100));
+};
+
+const median = (nums: number[]) => {
+    if (!nums.length) return 0;
+    const arr = [...nums].sort((a,b)=>a-b);
+    const mid = Math.floor(arr.length/2);
+    return arr.length % 2 ? (arr[mid] ?? 0) : (((arr[mid-1] ?? 0) + (arr[mid] ?? 0)) / 2);
+};
+
+const priceTrustScore = (price: number, baseline: number) => {
+    if (!baseline || baseline <= 0) return 60;
+    const deviation = Math.abs(price - baseline) / baseline;
+    return Math.round(clamp(100 - (deviation * 120), 5, 100));
+};
+
 
 const daysSincePosted = (dateStr: string): number => {
     const parsed = parseDate(dateStr);
@@ -469,61 +539,105 @@ const computeOpportunityScore = (profit: number, similarityScore: number, demand
     return Math.round(clamp(weighted, 0, 100));
 };
 
-const computeRealOpportunityScore = (profit: number, demandPrice: number, offerPrice: number, similarityScore: number, demandDateStr: string, offerDateStr: string): number => {
+const computeRealOpportunityScore = (
+    profit: number,
+    demandPrice: number,
+    offerPrice: number,
+    similarityScore: number,
+    demandDateStr: string,
+    offerDateStr: string,
+    locationScore: number,
+    trustScore: number,
+): number => {
     const netProfitScore = clamp(((profit - 400) / 7000) * 100, 0, 100);
     const margin = demandPrice > 0 ? ((demandPrice - offerPrice) / demandPrice) * 100 : 0;
     const marginScore = clamp(margin * 2.2, 0, 100);
     const freshnessDemand = clamp(100 - daysSincePosted(demandDateStr) * 6, 10, 100);
     const freshnessOffer = clamp(100 - daysSincePosted(offerDateStr) * 6, 10, 100);
-    const weighted = (netProfitScore * 0.35) + (similarityScore * 0.30) + (marginScore * 0.20) + (((freshnessDemand + freshnessOffer) / 2) * 0.15);
+    const freshness = (freshnessDemand + freshnessOffer) / 2;
+    const weighted = (netProfitScore * 0.28) + (similarityScore * 0.23) + (marginScore * 0.16) + (freshness * 0.13) + (locationScore * 0.10) + (trustScore * 0.10);
     return Math.round(clamp(weighted, 0, 100));
 };
 
 app.post('/alerts/notify', async (req, res) => {
     try {
-        const { telegramBotToken, telegramChatId, emailWebhookUrl, matches = [] } = req.body;
-        const topMatches = Array.isArray(matches) ? matches.slice(0, 5) : [];
+        const { telegramBotToken, telegramChatId, emailWebhookUrl, discordWebhookUrl, minProfit = 0, minScore = 0, matches = [] } = req.body;
+        const filtered = (Array.isArray(matches) ? matches : []).filter((m: any) => (m.arbitrageScore || 0) >= minProfit && (m.realOpportunityScore || m.opportunityScore || 0) >= minScore);
+        const topMatches = filtered.slice(0, 5);
         const summary = topMatches
-            .map((m: any, idx: number) => `${idx + 1}. ${m.offer?.title || 'N/A'} → ${m.arbitrageScore || 0} Kč (Opportunity ${m.opportunityScore || 0})`)
+            .map((m: any, idx: number) => `${idx + 1}. ${m.offer?.title || 'N/A'} → ${m.arbitrageScore || 0} Kč (Opportunity ${m.realOpportunityScore || m.opportunityScore || 0})`)
             .join('\n');
         const message = `📈 Bazoš alert: nové TOP příležitosti\n${summary || 'Žádné nové položky.'}`;
 
-        const results: { telegram?: string; email?: string } = {};
+        const results: { telegram?: string; email?: string; discord?: string } = {};
 
         if (telegramBotToken && telegramChatId) {
             const tgRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: telegramChatId, text: message }),
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: telegramChatId, text: message }),
             });
             results.telegram = tgRes.ok ? 'sent' : `failed (${tgRes.status})`;
         }
 
         if (emailWebhookUrl) {
             const emailRes = await fetch(emailWebhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    subject: 'Bazoš alert – nové ziskové příležitosti',
-                    text: message,
-                    matches: topMatches,
-                }),
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subject: 'Bazoš alert – nové ziskové příležitosti', text: message, matches: topMatches }),
             });
             results.email = emailRes.ok ? 'sent' : `failed (${emailRes.status})`;
         }
 
-        res.json({ message: 'Alert processing finished', results });
+        if (discordWebhookUrl) {
+            const discordRes = await fetch(discordWebhookUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: message }),
+            });
+            results.discord = discordRes.ok ? 'sent' : `failed (${discordRes.status})`;
+        }
+
+        res.json({ message: 'Alert processing finished', results, topMatchesCount: topMatches.length });
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        pushRuntimeLog(`Alert failed: ${errorMessage}`, 'error');
         res.status(500).json({ message: 'Alert failed', error: errorMessage });
     }
+});
+
+app.post('/match-meta', async (req, res) => {
+    try {
+        await saveMatchMeta(req.body || {});
+        res.json({ message: 'saved' });
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'match-meta failed', error: errorMessage });
+    }
+});
+
+app.get('/reports/daily', async (req, res) => {
+    const stats: any = await getDailyMetaStats();
+    res.json({
+        newCount: Number(stats.new_count || 0),
+        contactedCount: Number(stats.contacted_count || 0),
+        closedCount: Number(stats.closed_count || 0),
+    });
+});
+
+app.post('/export/csv', async (req, res) => {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    const headers = ['offerTitle','demandTitle','profit','opportunity','offerUrl','demandUrl','status','priority','note','lastActionAt'];
+    const csv = [headers.join(',')]
+      .concat(rows.map((r: any) => headers.map((h) => `"${String((r[h] ?? '')).replaceAll('"','""')}"`).join(',')))
+      .join('\n');
+    res.json({ csv });
 });
 
 app.post('/compare', async (req, res) => {
     try {
         const foundMatches: any[] = [];
+        pushRuntimeLog('Comparison started.', 'system');
         const seenMatches = new Set<string>();
         const comparisonMethod = req.body.comparisonMethod || 'auto';
+        const filterRules = req.body.filterRules || {};
+        const hideResolved = req.body.hideResolved !== false;
+        const resolvedMatchKeys = hideResolved ? new Set(await getResolvedMatchKeys()) : new Set<string>();
         
         let useAI = false;
         if (comparisonMethod === 'ollama') {
@@ -537,6 +651,8 @@ app.post('/compare', async (req, res) => {
         const allOffers = await getAllAdsByType('nabidka');
         const allDemands = await getAllAdsByType('poptavka');
 
+        pushRuntimeLog(`Loaded dataset for comparison: offers=${allOffers.length}, demands=${allDemands.length}`);
+
         if (allOffers.length === 0 || allDemands.length === 0) {
             return res.json({
                 message: 'Comparison complete! Not enough data in database to compare.',
@@ -547,8 +663,17 @@ app.post('/compare', async (req, res) => {
         const enrichedOffers: any[] = [];
         const enrichedDemands: any[] = [];
 
+        const offerPricesByBrand: Record<string, number[]> = {};
+        allOffers.forEach((offer: any) => {
+            const p = parsePrice(offer.price);
+            if (p !== null) {
+                offerPricesByBrand[offer.brand] = offerPricesByBrand[offer.brand] || [];
+                offerPricesByBrand[offer.brand]?.push(p);
+            }
+        });
+
         if (useAI) {
-            console.log('Processing offers with AI...');
+            pushRuntimeLog('Processing offers with AI...', 'system');
             for (const offerAd of allOffers) {
                 const model = offerAd.model_ai || await extractModelWithAI(offerAd.title, offerAd.description);
                 if (model && !offerAd.model_ai) await updateAdModelAi(offerAd.id, model);
@@ -560,7 +685,7 @@ app.post('/compare', async (req, res) => {
                 }
                 enrichedOffers.push({ ...offerAd, model_ai: model, parsed_embedding: embeddingData });
             }
-            console.log('Processing demands with AI...');
+            pushRuntimeLog('Processing demands with AI...', 'system');
             for (const demandAd of allDemands) {
                 const model = demandAd.model_ai || await extractModelWithAI(demandAd.title, demandAd.description);
                 if (model && !demandAd.model_ai) await updateAdModelAi(demandAd.id, model);
@@ -579,7 +704,12 @@ app.post('/compare', async (req, res) => {
 
         const useDatabaseVectorSearch = useAI && usingPostgres() && isPgVectorAvailable();
 
+        let processedDemands = 0;
         for (const demandAd of enrichedDemands) {
+            processedDemands += 1;
+            if (processedDemands % 50 === 0) {
+                pushRuntimeLog(`Comparison progress: processed ${processedDemands}/${enrichedDemands.length} demand ads, matches=${foundMatches.length}`);
+            }
             const demandPrice = parsePrice(demandAd.price);
             if (demandPrice === null) continue;
 
@@ -603,6 +733,21 @@ app.post('/compare', async (req, res) => {
 
                 if (demandPrice <= offerPrice) continue;
                 if (demandPrice > offerPrice * 1.6) continue;
+
+                const fullText = `${demandAd.title} ${demandAd.description} ${offerAd.title} ${offerAd.description}`.toLowerCase();
+                const blacklistTerms: string[] = Array.isArray(filterRules.blacklistTerms) ? filterRules.blacklistTerms : [];
+                if (blacklistTerms.some((term) => term && fullText.includes(String(term).toLowerCase()))) continue;
+
+                const whitelistModels: string[] = Array.isArray(filterRules.whitelistModels) ? filterRules.whitelistModels : [];
+                if (whitelistModels.length > 0) {
+                    const modelText = `${demandAd.title} ${offerAd.title}`.toLowerCase();
+                    if (!whitelistModels.some((m) => modelText.includes(String(m).toLowerCase()))) continue;
+                }
+
+                const minPrice = typeof filterRules.minPrice === 'number' ? filterRules.minPrice : null;
+                const maxPrice = typeof filterRules.maxPrice === 'number' ? filterRules.maxPrice : null;
+                if (minPrice !== null && offerPrice < minPrice) continue;
+                if (maxPrice !== null && offerPrice > maxPrice) continue;
 
                 let isMatch = false;
                 let similarityScore = 0;
@@ -658,7 +803,12 @@ app.post('/compare', async (req, res) => {
 
                     const arbitrageScore = demandPrice - offerPrice;
                     const opportunityScore = computeOpportunityScore(arbitrageScore, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '');
-                    const realOpportunityScore = computeRealOpportunityScore(arbitrageScore, demandPrice, offerPrice, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '');
+                    const locScore = locationSimilarity(demandAd.location || '', offerAd.location || '');
+                    const baseline = median(offerPricesByBrand[demandAd.brand] || []);
+                    const trustScore = priceTrustScore(offerPrice as number, baseline);
+                    const realOpportunityScore = computeRealOpportunityScore(arbitrageScore, demandPrice, offerPrice, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '', locScore, trustScore);
+
+                    if (resolvedMatchKeys.has(dedupKey)) continue;
 
                     const matchObj = {
                         offer: { ...offerAd, similarity: similarityScore, ai: useAI },
@@ -667,6 +817,8 @@ app.post('/compare', async (req, res) => {
                         opportunityScore,
                         realOpportunityScore,
                         expectedNetProfit: Math.max(0, Math.round(arbitrageScore - 400)),
+                        locationScore: locScore,
+                        priceTrustScore: trustScore,
                     };
                     foundMatches.push(matchObj);
                     await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
@@ -676,6 +828,7 @@ app.post('/compare', async (req, res) => {
 
         // Seřazení výsledků od nejvyššího potenciálního zisku (arbitrážního skóre)
         foundMatches.sort((a, b) => (b.realOpportunityScore - a.realOpportunityScore) || (b.arbitrageScore - a.arbitrageScore));
+        pushRuntimeLog(`Comparison finished. Found ${foundMatches.length} matches.`, foundMatches.length > 0 ? 'success' : 'system');
 
         res.json({
             message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered Embeddings)' : '(Keyword Powered)'}`,
@@ -683,6 +836,7 @@ app.post('/compare', async (req, res) => {
         });
 
     } catch (error) {
+pushRuntimeLog(`Comparison error: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
         console.error('An error occurred during comparison:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         res.status(500).json({ message: 'An error occurred during comparison.', error: errorMessage });
@@ -690,5 +844,5 @@ app.post('/compare', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Backend server is running at http://localhost:${port}`);
+    pushRuntimeLog(`Backend server is running at http://localhost:${port}`, 'success');
 });
