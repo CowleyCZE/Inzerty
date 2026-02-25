@@ -45,6 +45,31 @@ const getPgPool = () => {
   return postgresPool;
 };
 
+
+const ensurePostgresColumns = async (pool: any) => {
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS model_ai TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS embedding TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS price_value DOUBLE PRECISION');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS location TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS description TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS date_posted TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS image_url TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS ad_type TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS brand TEXT');
+  await pool.query('ALTER TABLE ads ADD COLUMN IF NOT EXISTS scraped_at TIMESTAMPTZ');
+};
+
+const ensureSqliteColumns = async (db: Database, tableName: string, requiredColumns: Array<{ name: string; ddl: string }>) => {
+  const rows = await db.all<Array<{ name: string }>>(`PRAGMA table_info(${tableName})`);
+  const existing = new Set(rows.map((r) => r.name));
+
+  for (const column of requiredColumns) {
+    if (!existing.has(column.name)) {
+      await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${column.ddl}`);
+    }
+  }
+};
+
 export const usingPostgres = () => DB_CLIENT === 'postgres';
 
 export const initDb = async () => {
@@ -104,6 +129,8 @@ export const initDb = async () => {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
+    await ensurePostgresColumns(pool);
 
     try {
       await pool.query('CREATE EXTENSION IF NOT EXISTS vector');
@@ -172,6 +199,30 @@ export const initDb = async () => {
         updated_at TEXT NOT NULL
       );
   `);
+
+  await ensureSqliteColumns(db, 'ads', [
+    { name: 'price_value', ddl: 'price_value REAL' },
+    { name: 'location', ddl: 'location TEXT' },
+    { name: 'description', ddl: 'description TEXT' },
+    { name: 'date_posted', ddl: 'date_posted TEXT' },
+    { name: 'image_url', ddl: 'image_url TEXT' },
+    { name: 'ad_type', ddl: 'ad_type TEXT' },
+    { name: 'brand', ddl: 'brand TEXT' },
+    { name: 'scraped_at', ddl: 'scraped_at TEXT' },
+    { name: 'model_ai', ddl: 'model_ai TEXT' },
+    { name: 'embedding', ddl: 'embedding TEXT' },
+  ]);
+
+  await ensureSqliteColumns(db, 'match_meta', [
+    { name: 'priority', ddl: 'priority TEXT' },
+    { name: 'last_action_at', ddl: 'last_action_at TEXT' },
+    { name: 'resolved', ddl: 'resolved INTEGER DEFAULT 0' },
+    { name: 'follow_up_at', ddl: 'follow_up_at TEXT' },
+    { name: 'follow_up_state', ddl: 'follow_up_state TEXT' },
+    { name: 'checklist_json', ddl: 'checklist_json TEXT' },
+    { name: 'updated_at', ddl: "updated_at TEXT NOT NULL DEFAULT ''" },
+  ]);
+
   isInitialized = true;
   console.log('SQLite database initialized');
 };
