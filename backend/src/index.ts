@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities } from './database.js';
+import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities, saveMatchMeta, getResolvedMatchKeys, getDailyMetaStats } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -454,6 +454,35 @@ app.post('/scrape-all', async (req, res) => {
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
+const normalizeText = (value: string) => (value || '').toLowerCase();
+
+const locationSimilarity = (demandLocation: string, offerLocation: string) => {
+    const a = normalizeText(demandLocation).trim();
+    const b = normalizeText(offerLocation).trim();
+    if (!a || !b) return 55;
+    if (a === b) return 100;
+    const tokenA = new Set(a.split(/[\s,.-]+/).filter(Boolean));
+    const tokenB = new Set(b.split(/[\s,.-]+/).filter(Boolean));
+    let inter = 0;
+    tokenA.forEach((t) => { if (tokenB.has(t)) inter += 1; });
+    const denom = Math.max(1, Math.max(tokenA.size, tokenB.size));
+    return Math.round(clamp((inter / denom) * 100, 35, 100));
+};
+
+const median = (nums: number[]) => {
+    if (!nums.length) return 0;
+    const arr = [...nums].sort((a,b)=>a-b);
+    const mid = Math.floor(arr.length/2);
+    return arr.length % 2 ? (arr[mid] ?? 0) : (((arr[mid-1] ?? 0) + (arr[mid] ?? 0)) / 2);
+};
+
+const priceTrustScore = (price: number, baseline: number) => {
+    if (!baseline || baseline <= 0) return 60;
+    const deviation = Math.abs(price - baseline) / baseline;
+    return Math.round(clamp(100 - (deviation * 120), 5, 100));
+};
+
+
 const daysSincePosted = (dateStr: string): number => {
     const parsed = parseDate(dateStr);
     if (!parsed) return 14;
@@ -469,54 +498,93 @@ const computeOpportunityScore = (profit: number, similarityScore: number, demand
     return Math.round(clamp(weighted, 0, 100));
 };
 
-const computeRealOpportunityScore = (profit: number, demandPrice: number, offerPrice: number, similarityScore: number, demandDateStr: string, offerDateStr: string): number => {
+const computeRealOpportunityScore = (
+    profit: number,
+    demandPrice: number,
+    offerPrice: number,
+    similarityScore: number,
+    demandDateStr: string,
+    offerDateStr: string,
+    locationScore: number,
+    trustScore: number,
+): number => {
     const netProfitScore = clamp(((profit - 400) / 7000) * 100, 0, 100);
     const margin = demandPrice > 0 ? ((demandPrice - offerPrice) / demandPrice) * 100 : 0;
     const marginScore = clamp(margin * 2.2, 0, 100);
     const freshnessDemand = clamp(100 - daysSincePosted(demandDateStr) * 6, 10, 100);
     const freshnessOffer = clamp(100 - daysSincePosted(offerDateStr) * 6, 10, 100);
-    const weighted = (netProfitScore * 0.35) + (similarityScore * 0.30) + (marginScore * 0.20) + (((freshnessDemand + freshnessOffer) / 2) * 0.15);
+    const freshness = (freshnessDemand + freshnessOffer) / 2;
+    const weighted = (netProfitScore * 0.28) + (similarityScore * 0.23) + (marginScore * 0.16) + (freshness * 0.13) + (locationScore * 0.10) + (trustScore * 0.10);
     return Math.round(clamp(weighted, 0, 100));
 };
 
 app.post('/alerts/notify', async (req, res) => {
     try {
-        const { telegramBotToken, telegramChatId, emailWebhookUrl, matches = [] } = req.body;
-        const topMatches = Array.isArray(matches) ? matches.slice(0, 5) : [];
+        const { telegramBotToken, telegramChatId, emailWebhookUrl, discordWebhookUrl, minProfit = 0, minScore = 0, matches = [] } = req.body;
+        const filtered = (Array.isArray(matches) ? matches : []).filter((m: any) => (m.arbitrageScore || 0) >= minProfit && (m.realOpportunityScore || m.opportunityScore || 0) >= minScore);
+        const topMatches = filtered.slice(0, 5);
         const summary = topMatches
-            .map((m: any, idx: number) => `${idx + 1}. ${m.offer?.title || 'N/A'} → ${m.arbitrageScore || 0} Kč (Opportunity ${m.opportunityScore || 0})`)
+            .map((m: any, idx: number) => `${idx + 1}. ${m.offer?.title || 'N/A'} → ${m.arbitrageScore || 0} Kč (Opportunity ${m.realOpportunityScore || m.opportunityScore || 0})`)
             .join('\n');
         const message = `📈 Bazoš alert: nové TOP příležitosti\n${summary || 'Žádné nové položky.'}`;
 
-        const results: { telegram?: string; email?: string } = {};
+        const results: { telegram?: string; email?: string; discord?: string } = {};
 
         if (telegramBotToken && telegramChatId) {
             const tgRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: telegramChatId, text: message }),
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: telegramChatId, text: message }),
             });
             results.telegram = tgRes.ok ? 'sent' : `failed (${tgRes.status})`;
         }
 
         if (emailWebhookUrl) {
             const emailRes = await fetch(emailWebhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    subject: 'Bazoš alert – nové ziskové příležitosti',
-                    text: message,
-                    matches: topMatches,
-                }),
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subject: 'Bazoš alert – nové ziskové příležitosti', text: message, matches: topMatches }),
             });
             results.email = emailRes.ok ? 'sent' : `failed (${emailRes.status})`;
         }
 
-        res.json({ message: 'Alert processing finished', results });
+        if (discordWebhookUrl) {
+            const discordRes = await fetch(discordWebhookUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: message }),
+            });
+            results.discord = discordRes.ok ? 'sent' : `failed (${discordRes.status})`;
+        }
+
+        res.json({ message: 'Alert processing finished', results, topMatchesCount: topMatches.length });
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         res.status(500).json({ message: 'Alert failed', error: errorMessage });
     }
+});
+
+app.post('/match-meta', async (req, res) => {
+    try {
+        await saveMatchMeta(req.body || {});
+        res.json({ message: 'saved' });
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'match-meta failed', error: errorMessage });
+    }
+});
+
+app.get('/reports/daily', async (req, res) => {
+    const stats: any = await getDailyMetaStats();
+    res.json({
+        newCount: Number(stats.new_count || 0),
+        contactedCount: Number(stats.contacted_count || 0),
+        closedCount: Number(stats.closed_count || 0),
+    });
+});
+
+app.post('/export/csv', async (req, res) => {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    const headers = ['offerTitle','demandTitle','profit','opportunity','offerUrl','demandUrl','status','priority','note','lastActionAt'];
+    const csv = [headers.join(',')]
+      .concat(rows.map((r: any) => headers.map((h) => `"${String((r[h] ?? '')).replaceAll('"','""')}"`).join(',')))
+      .join('\n');
+    res.json({ csv });
 });
 
 app.post('/compare', async (req, res) => {
@@ -524,6 +592,9 @@ app.post('/compare', async (req, res) => {
         const foundMatches: any[] = [];
         const seenMatches = new Set<string>();
         const comparisonMethod = req.body.comparisonMethod || 'auto';
+        const filterRules = req.body.filterRules || {};
+        const hideResolved = req.body.hideResolved !== false;
+        const resolvedMatchKeys = hideResolved ? new Set(await getResolvedMatchKeys()) : new Set<string>();
         
         let useAI = false;
         if (comparisonMethod === 'ollama') {
@@ -546,6 +617,15 @@ app.post('/compare', async (req, res) => {
 
         const enrichedOffers: any[] = [];
         const enrichedDemands: any[] = [];
+
+        const offerPricesByBrand: Record<string, number[]> = {};
+        allOffers.forEach((offer: any) => {
+            const p = parsePrice(offer.price);
+            if (p !== null) {
+                offerPricesByBrand[offer.brand] = offerPricesByBrand[offer.brand] || [];
+                offerPricesByBrand[offer.brand]?.push(p);
+            }
+        });
 
         if (useAI) {
             console.log('Processing offers with AI...');
@@ -604,6 +684,21 @@ app.post('/compare', async (req, res) => {
                 if (demandPrice <= offerPrice) continue;
                 if (demandPrice > offerPrice * 1.6) continue;
 
+                const fullText = `${demandAd.title} ${demandAd.description} ${offerAd.title} ${offerAd.description}`.toLowerCase();
+                const blacklistTerms: string[] = Array.isArray(filterRules.blacklistTerms) ? filterRules.blacklistTerms : [];
+                if (blacklistTerms.some((term) => term && fullText.includes(String(term).toLowerCase()))) continue;
+
+                const whitelistModels: string[] = Array.isArray(filterRules.whitelistModels) ? filterRules.whitelistModels : [];
+                if (whitelistModels.length > 0) {
+                    const modelText = `${demandAd.title} ${offerAd.title}`.toLowerCase();
+                    if (!whitelistModels.some((m) => modelText.includes(String(m).toLowerCase()))) continue;
+                }
+
+                const minPrice = typeof filterRules.minPrice === 'number' ? filterRules.minPrice : null;
+                const maxPrice = typeof filterRules.maxPrice === 'number' ? filterRules.maxPrice : null;
+                if (minPrice !== null && offerPrice < minPrice) continue;
+                if (maxPrice !== null && offerPrice > maxPrice) continue;
+
                 let isMatch = false;
                 let similarityScore = 0;
 
@@ -658,7 +753,12 @@ app.post('/compare', async (req, res) => {
 
                     const arbitrageScore = demandPrice - offerPrice;
                     const opportunityScore = computeOpportunityScore(arbitrageScore, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '');
-                    const realOpportunityScore = computeRealOpportunityScore(arbitrageScore, demandPrice, offerPrice, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '');
+                    const locScore = locationSimilarity(demandAd.location || '', offerAd.location || '');
+                    const baseline = median(offerPricesByBrand[demandAd.brand] || []);
+                    const trustScore = priceTrustScore(offerPrice as number, baseline);
+                    const realOpportunityScore = computeRealOpportunityScore(arbitrageScore, demandPrice, offerPrice, similarityScore, demandAd.date_posted || '', offerAd.date_posted || '', locScore, trustScore);
+
+                    if (resolvedMatchKeys.has(dedupKey)) continue;
 
                     const matchObj = {
                         offer: { ...offerAd, similarity: similarityScore, ai: useAI },
@@ -667,6 +767,8 @@ app.post('/compare', async (req, res) => {
                         opportunityScore,
                         realOpportunityScore,
                         expectedNetProfit: Math.max(0, Math.round(arbitrageScore - 400)),
+                        locationScore: locScore,
+                        priceTrustScore: trustScore,
                     };
                     foundMatches.push(matchObj);
                     await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
