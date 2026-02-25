@@ -39,5 +39,7 @@ export const DEFAULT_CONFIG = {
     price: '.inzeratycena',
     date: '.velikost10',
     link: '.nadpis a',
+    description: '.popis',
+    location: '.inzeratylok',
   }
 };
