@@ -27,6 +27,36 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 let ollamaProcess: ChildProcess | null = null;
 let isOllamaRunning = false;
 
+type RuntimeLogEntry = {
+    id: string;
+    timestamp: string;
+    message: string;
+    type: 'info' | 'success' | 'error' | 'system';
+};
+
+const runtimeLogs: RuntimeLogEntry[] = [];
+const MAX_RUNTIME_LOGS = 500;
+
+const pushRuntimeLog = (message: string, type: RuntimeLogEntry['type'] = 'info') => {
+    const entry: RuntimeLogEntry = {
+        id: randomUUID(),
+        timestamp: new Date().toLocaleTimeString('cs-CZ'),
+        message,
+        type,
+    };
+    runtimeLogs.push(entry);
+    if (runtimeLogs.length > MAX_RUNTIME_LOGS) {
+        runtimeLogs.splice(0, runtimeLogs.length - MAX_RUNTIME_LOGS);
+    }
+
+    if (type === 'error') {
+        console.error(`[${entry.timestamp}] ${message}`);
+    } else {
+        console.log(`[${entry.timestamp}] ${message}`);
+    }
+};
+
+
 const checkOllamaStatus = async () => {
     try {
         await axios.get(`${OLLAMA_BASE_URL}/api/tags`);
@@ -87,6 +117,16 @@ app.post('/ollama/toggle', async (req, res) => {
 app.get('/ollama/status', async (req, res) => {
     const running = await checkOllamaStatus();
     res.json({ status: running });
+});
+
+
+app.get('/logs', (req, res) => {
+    res.json({ logs: runtimeLogs.slice(-200) });
+});
+
+app.post('/logs/clear', (req, res) => {
+    runtimeLogs.length = 0;
+    res.json({ message: 'Logs cleared' });
 });
 
 const BRANDS = [
@@ -292,10 +332,10 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
     let latestSeenUrl: string | null = null;
     let latestSeenDate: string | null = null;
 
-    console.log(`Starting scrape for ${brand} (${adType}) at ${url}`);
+    pushRuntimeLog(`Starting scrape for ${brand} (${adType}) at ${url}`, 'system');
 
     while (scrapedAds.length < 50 && hasNextPage && pagesScraped < 50) {
-        console.log(`Scraping page: ${currentPageUrl}`);
+        pushRuntimeLog(`Scraping page: ${currentPageUrl}`);
         pagesScraped++;
 
         try {
@@ -306,7 +346,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
 
             const items = $(selectors.item);
             if (items.length === 0) {
-                console.log('No items found on page. Stopping.');
+                pushRuntimeLog('No items found on page. Stopping.', 'system');
                 break;
             }
 
@@ -316,13 +356,13 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 const adDate = parseDate(adDateStr);
 
                 if (adDate && adDate < twoMonthsAgo) {
-                    console.log(`Found ad older than 2 months (${adDateStr}). Stopping.`);
+                    pushRuntimeLog(`Found ad older than 2 months (${adDateStr}). Stopping.`, 'system');
                     shouldStop = true;
                     break;
                 }
 
                 if (checkpointDate && adDate && adDate <= checkpointDate) {
-                    console.log(`Narazili jsme na inzerát starší nebo stejný jako checkpoint (${adDateStr}). Inkrementální scraping končí.`);
+                    pushRuntimeLog(`Narazili jsme na inzerát starší nebo stejný jako checkpoint (${adDateStr}). Inkrementální scraping končí.`, 'system');
                     shouldStop = true;
                     break;
                 }
@@ -331,13 +371,13 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 const fullLink = link && !link.startsWith('http') ? `${baseUrl}${link}` : link;
                 
                 if (fullLink && checkpoint?.lastSeenUrl && fullLink === checkpoint.lastSeenUrl) {
-                    console.log(`Dosažen uložený checkpoint URL pro ${brand}. Inkrementální scraping končí.`);
+                    pushRuntimeLog(`Dosažen uložený checkpoint URL pro ${brand}. Inkrementální scraping končí.`, 'system');
                     shouldStop = true;
                     break;
                 }
 
                 if (fullLink && recentUrls.includes(fullLink)) {
-                    console.log(`Inzerát ${fullLink} již byl dříve stažen. Skript končí inkrementální stahování pro ${brand}.`);
+                    pushRuntimeLog(`Inzerát ${fullLink} již byl dříve stažen. Skript končí inkrementální stahování pro ${brand}.`, 'system');
                     shouldStop = true;
                     break;
                 }
@@ -372,7 +412,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 scrapedAds.push(ad);
 
                 if (scrapedAds.length >= 50) {
-                    console.log('Reached 50 ads limit. Stopping.');
+                    pushRuntimeLog('Reached 50 ads limit. Stopping.', 'system');
                     shouldStop = true;
                     break;
                 }
@@ -385,7 +425,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 currentPageUrl = new URL(nextPageLink, baseUrl).href;
             } else {
                 hasNextPage = false;
-                console.log('No next page link found. Stopping.');
+                pushRuntimeLog('No next page link found. Stopping.', 'system');
             }
         } catch (error) {
             console.error(`Scraping failed completely for ${currentPageUrl} after retries. Preskakuji stránku.`);
@@ -404,7 +444,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
         await updateScrapeCheckpoint(brand, adType, latestSeenUrl, latestSeenDate);
     }
 
-    console.log(`Successfully scraped ${scrapedAds.length} ads. Saved to ${filePath}`);
+    pushRuntimeLog(`Successfully scraped ${scrapedAds.length} ads. Saved to ${filePath}`, 'success');
     return scrapedAds;
 }
 
@@ -421,7 +461,7 @@ app.post('/scrape-all', async (req, res) => {
         let totalPoptavka = 0;
 
         for (const brand of BRANDS) {
-            console.log(`Scraping offers for ${brand}`);
+            pushRuntimeLog(`Scraping offers for ${brand}`, 'system');
             let brandUrlSegment = brand.toLowerCase().replace(/ /g, '-');
             if (brand === 'Sony') {
                 brandUrlSegment = 'ericsson';
@@ -433,7 +473,7 @@ app.post('/scrape-all', async (req, res) => {
             scrapedData.nabidka.push(...offerAds);
             totalNabidka += offerAds.length;
 
-            console.log(`Scraping demands for ${brand}`);
+            pushRuntimeLog(`Scraping demands for ${brand}`, 'system');
             const demandAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'poptavka', selectors);
             scrapedData.poptavka.push(...demandAds);
             totalPoptavka += demandAds.length;
@@ -445,6 +485,7 @@ app.post('/scrape-all', async (req, res) => {
         });
 
     } catch (error) {
+pushRuntimeLog(`Scraping error: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
         console.error('An error occurred during scraping:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         res.status(500).json({ message: 'An error occurred during scraping.', error: errorMessage });
@@ -555,6 +596,7 @@ app.post('/alerts/notify', async (req, res) => {
         res.json({ message: 'Alert processing finished', results, topMatchesCount: topMatches.length });
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        pushRuntimeLog(`Alert failed: ${errorMessage}`, 'error');
         res.status(500).json({ message: 'Alert failed', error: errorMessage });
     }
 });
@@ -590,6 +632,7 @@ app.post('/export/csv', async (req, res) => {
 app.post('/compare', async (req, res) => {
     try {
         const foundMatches: any[] = [];
+        pushRuntimeLog('Comparison started.', 'system');
         const seenMatches = new Set<string>();
         const comparisonMethod = req.body.comparisonMethod || 'auto';
         const filterRules = req.body.filterRules || {};
@@ -607,6 +650,8 @@ app.post('/compare', async (req, res) => {
 
         const allOffers = await getAllAdsByType('nabidka');
         const allDemands = await getAllAdsByType('poptavka');
+
+        pushRuntimeLog(`Loaded dataset for comparison: offers=${allOffers.length}, demands=${allDemands.length}`);
 
         if (allOffers.length === 0 || allDemands.length === 0) {
             return res.json({
@@ -628,7 +673,7 @@ app.post('/compare', async (req, res) => {
         });
 
         if (useAI) {
-            console.log('Processing offers with AI...');
+            pushRuntimeLog('Processing offers with AI...', 'system');
             for (const offerAd of allOffers) {
                 const model = offerAd.model_ai || await extractModelWithAI(offerAd.title, offerAd.description);
                 if (model && !offerAd.model_ai) await updateAdModelAi(offerAd.id, model);
@@ -640,7 +685,7 @@ app.post('/compare', async (req, res) => {
                 }
                 enrichedOffers.push({ ...offerAd, model_ai: model, parsed_embedding: embeddingData });
             }
-            console.log('Processing demands with AI...');
+            pushRuntimeLog('Processing demands with AI...', 'system');
             for (const demandAd of allDemands) {
                 const model = demandAd.model_ai || await extractModelWithAI(demandAd.title, demandAd.description);
                 if (model && !demandAd.model_ai) await updateAdModelAi(demandAd.id, model);
@@ -659,7 +704,12 @@ app.post('/compare', async (req, res) => {
 
         const useDatabaseVectorSearch = useAI && usingPostgres() && isPgVectorAvailable();
 
+        let processedDemands = 0;
         for (const demandAd of enrichedDemands) {
+            processedDemands += 1;
+            if (processedDemands % 50 === 0) {
+                pushRuntimeLog(`Comparison progress: processed ${processedDemands}/${enrichedDemands.length} demand ads, matches=${foundMatches.length}`);
+            }
             const demandPrice = parsePrice(demandAd.price);
             if (demandPrice === null) continue;
 
@@ -778,6 +828,7 @@ app.post('/compare', async (req, res) => {
 
         // Seřazení výsledků od nejvyššího potenciálního zisku (arbitrážního skóre)
         foundMatches.sort((a, b) => (b.realOpportunityScore - a.realOpportunityScore) || (b.arbitrageScore - a.arbitrageScore));
+        pushRuntimeLog(`Comparison finished. Found ${foundMatches.length} matches.`, foundMatches.length > 0 ? 'success' : 'system');
 
         res.json({
             message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered Embeddings)' : '(Keyword Powered)'}`,
@@ -785,6 +836,7 @@ app.post('/compare', async (req, res) => {
         });
 
     } catch (error) {
+pushRuntimeLog(`Comparison error: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
         console.error('An error occurred during comparison:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         res.status(500).json({ message: 'An error occurred during comparison.', error: errorMessage });
@@ -792,5 +844,5 @@ app.post('/compare', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Backend server is running at http://localhost:${port}`);
+    pushRuntimeLog(`Backend server is running at http://localhost:${port}`, 'success');
 });

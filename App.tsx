@@ -6,7 +6,7 @@ import { Ad, Config, MatchItem } from './types';
 import { DEFAULT_CONFIG } from './constants.tsx';
 import ProgressDisplay from './components/ProgressDisplay';
 import ScrapeSummary from './components/ScrapeSummary';
-import MainInfo from './components/MainInfo';
+import LogPanel from './components/LogPanel';
 import SettingsPage from './components/SettingsPage';
 
 type AppView = 'dashboard' | 'settings';
@@ -23,6 +23,28 @@ const App = () => {
   const [ollamaActive, setOllamaActive] = useState(false);
   const [view, setView] = useState<AppView>('dashboard');
   const [lastScrapeDuration, setLastScrapeDuration] = useState<number | null>(null);
+  const [runtimeLogs, setRuntimeLogs] = useState<Array<{ id: string; timestamp: string; message: string; type: 'info' | 'success' | 'error' | 'system' }>>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchLogs = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/logs');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (mounted) setRuntimeLogs(Array.isArray(data.logs) ? data.logs : []);
+      } catch {
+        // ignore log polling errors
+      }
+    };
+
+    fetchLogs();
+    const timer = setInterval(fetchLogs, 1500);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const checkOllama = async () => {
@@ -150,7 +172,7 @@ const App = () => {
 
         {view === 'dashboard' ? (
           <>
-            <MainInfo />
+            <LogPanel logs={runtimeLogs} />
             <ProgressDisplay progress={progress} />
             {appState === 'scraping-done' && scrapeSummary && <ScrapeSummary summary={scrapeSummary} />}
             {matchedAds.length > 0 && <ResultsDisplay matchedAds={matchedAds} isLoading={isComparing} />}
