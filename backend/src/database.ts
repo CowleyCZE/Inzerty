@@ -70,6 +70,62 @@ const ensureSqliteColumns = async (db: Database, tableName: string, requiredColu
   }
 };
 
+const ensurePostgresAdUniqueness = async (pool: any) => {
+  await pool.query('ALTER TABLE ads DROP CONSTRAINT IF EXISTS ads_url_key');
+  await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS ads_url_ad_type_unique_idx ON ads(url, ad_type)');
+};
+
+const rebuildSqliteAdsForCompositeUnique = async (db: Database) => {
+  const indexRows = await db.all<Array<{ name: string; unique: number; origin: string }>>('PRAGMA index_list(ads)');
+  const hasUrlOnlyUnique = indexRows.some((row) => row.unique === 1 && row.origin === 'u');
+  if (!hasUrlOnlyUnique) return;
+
+  await db.exec('PRAGMA foreign_keys = OFF;');
+  await db.exec('BEGIN TRANSACTION;');
+  try {
+    await db.exec(`
+      CREATE TABLE ads_new (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        price TEXT,
+        price_value REAL,
+        location TEXT,
+        description TEXT,
+        date_posted TEXT,
+        url TEXT,
+        image_url TEXT,
+        ad_type TEXT,
+        brand TEXT,
+        scraped_at TEXT,
+        model_ai TEXT,
+        embedding TEXT,
+        UNIQUE(url, ad_type)
+      );
+    `);
+
+    await db.exec(`
+      INSERT OR IGNORE INTO ads_new (id, title, price, price_value, location, description, date_posted, url, image_url, ad_type, brand, scraped_at, model_ai, embedding)
+      SELECT id, title, price, price_value, location, description, date_posted, url, image_url, ad_type, brand, scraped_at, model_ai, embedding
+      FROM ads
+      ORDER BY scraped_at DESC
+    `);
+
+    await db.exec('DROP TABLE ads;');
+    await db.exec('ALTER TABLE ads_new RENAME TO ads;');
+    await db.exec('COMMIT;');
+  } catch (error) {
+    await db.exec('ROLLBACK;');
+    throw error;
+  } finally {
+    await db.exec('PRAGMA foreign_keys = ON;');
+  }
+};
+
+const ensureSqliteAdUniqueness = async (db: Database) => {
+  await rebuildSqliteAdsForCompositeUnique(db);
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_ads_url_ad_type ON ads(url, ad_type)');
+};
+
 export const usingPostgres = () => DB_CLIENT === 'postgres';
 
 export const initDb = async () => {
@@ -86,7 +142,7 @@ export const initDb = async () => {
         location TEXT,
         description TEXT,
         date_posted TEXT,
-        url TEXT UNIQUE,
+        url TEXT,
         image_url TEXT,
         ad_type TEXT,
         brand TEXT,
@@ -131,6 +187,7 @@ export const initDb = async () => {
     `);
 
     await ensurePostgresColumns(pool);
+    await ensurePostgresAdUniqueness(pool);
 
     try {
       await pool.query('CREATE EXTENSION IF NOT EXISTS vector');
@@ -156,7 +213,7 @@ export const initDb = async () => {
         location TEXT,
         description TEXT,
         date_posted TEXT,
-        url TEXT UNIQUE,
+        url TEXT,
         image_url TEXT,
         ad_type TEXT,
         brand TEXT,
@@ -213,6 +270,8 @@ export const initDb = async () => {
     { name: 'embedding', ddl: 'embedding TEXT' },
   ]);
 
+  await ensureSqliteAdUniqueness(db);
+
   await ensureSqliteColumns(db, 'match_meta', [
     { name: 'priority', ddl: 'priority TEXT' },
     { name: 'last_action_at', ddl: 'last_action_at TEXT' },
@@ -229,7 +288,7 @@ export const initDb = async () => {
 
 export const isPgVectorAvailable = () => usingPostgres() && pgVectorReady;
 
-export const saveAd = async (ad: any) => {
+export const saveAd = async (ad: any): Promise<boolean> => {
   await initDb();
 
   const rawPrice = ad.price ? parseFloat(ad.price.replace(/[^0-9,-]+/g, '').replace(',', '.')) : null;
@@ -237,10 +296,10 @@ export const saveAd = async (ad: any) => {
 
   if (DB_CLIENT === 'postgres') {
     const pool = getPgPool();
-    await pool.query(
+    const result = await pool.query(
       `INSERT INTO ads (id, title, price, price_value, location, description, date_posted, url, image_url, ad_type, brand, scraped_at, model_ai, embedding)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       ON CONFLICT (url) DO NOTHING`,
+       ON CONFLICT (url, ad_type) DO NOTHING`,
       [
         ad.id,
         ad.title,
@@ -258,11 +317,11 @@ export const saveAd = async (ad: any) => {
         null,
       ],
     );
-    return;
+    return result.rowCount > 0;
   }
 
   const db = await getSqliteDb();
-  await db.run(
+  const result = await db.run(
     `INSERT OR IGNORE INTO ads (id, title, price, price_value, location, description, date_posted, url, image_url, ad_type, brand, scraped_at, model_ai, embedding)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -282,6 +341,7 @@ export const saveAd = async (ad: any) => {
       null,
     ],
   );
+  return (result.changes ?? 0) > 0;
 };
 
 export const getAllAds = async () => {
