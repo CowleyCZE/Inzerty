@@ -56,6 +56,10 @@ export interface Config {
   itemCount: number;
   url: string;
   comparisonMethod?: string;
+  scrapingOptions?: {
+    stopOnKnownAd: boolean;
+    maxAdsPerTypePerBrand: number;
+  };
   filterRules?: {
     blacklistTerms: string[];
     whitelistModels: string[];
