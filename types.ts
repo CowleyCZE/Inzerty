@@ -50,6 +50,14 @@ export interface MatchItem {
   priceTrustScore?: number;
 }
 
+export interface ScrapeSummaryData {
+  nabidka: number;
+  poptavka: number;
+  savedNabidka?: number;
+  savedPoptavka?: number;
+  healthWarning?: string;
+}
+
 export interface Config {
   brand: string;
   adType: string;

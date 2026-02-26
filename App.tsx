@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import ResultsDisplay from './components/ResultsDisplay';
 import MonitoringDashboard from './components/MonitoringDashboard';
-import { Ad, Config, MatchItem } from './types';
+import { Ad, Config, MatchItem, ScrapeSummaryData } from './types';
 import { DEFAULT_CONFIG } from './constants.tsx';
 import ProgressDisplay from './components/ProgressDisplay';
 import ScrapeSummary from './components/ScrapeSummary';
@@ -17,8 +17,8 @@ const App = () => {
   const [matchedAds, setMatchedAds] = useState<MatchItem[]>([]);
   const [isScraping, setIsScraping] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
-  const [scrapeSummary, setScrapeSummary] = useState<{ nabidka: number; poptavka: number } | null>(null);
-  const [progress, setProgress] = useState('Ready to start.');
+  const [scrapeSummary, setScrapeSummary] = useState<ScrapeSummaryData | null>(null);
+  const [progress, setProgress] = useState('Připraveno ke spuštění.');
   const [appState, setAppState] = useState('idle');
   const [ollamaActive, setOllamaActive] = useState(false);
   const [view, setView] = useState<AppView>('dashboard');
@@ -53,7 +53,7 @@ const App = () => {
         const data = await res.json();
         setOllamaActive(data.status);
       } catch {
-        console.error('Failed to check Ollama status');
+        console.error('Nepodařilo se ověřit stav Ollama serveru');
       }
     };
     checkOllama();
@@ -62,7 +62,7 @@ const App = () => {
   const toggleOllama = async () => {
     try {
       const action = ollamaActive ? 'stop' : 'start';
-      setProgress(`${action === 'start' ? 'Starting' : 'Stopping'} Ollama server...`);
+      setProgress(`${action === 'start' ? 'Spouštím' : 'Zastavuji'} server Ollama...`);
       const res = await fetch('http://localhost:3001/ollama/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,7 +72,7 @@ const App = () => {
       setOllamaActive(data.status);
       setProgress(data.message);
     } catch {
-      setProgress('Failed to toggle Ollama.');
+      setProgress('Nepodařilo se změnit stav Ollama serveru.');
     }
   };
 
@@ -83,7 +83,7 @@ const App = () => {
     setMatchedAds([]);
     setLastScrapeDuration(null);
     const startTime = performance.now();
-    setProgress('Starting scraping process...');
+    setProgress('Spouštím proces scrapování...');
 
     try {
       const response = await fetch('http://localhost:3001/scrape-all', {
@@ -94,17 +94,23 @@ const App = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `Server responded with error ${response.status}`);
+        throw new Error(errorData.message || `Server vrátil chybu ${response.status}`);
       }
 
       const result = await response.json();
       setAds(result.data.ads || []);
-      setScrapeSummary({ nabidka: result.data.nabidkaCount, poptavka: result.data.poptavkaCount });
+      setScrapeSummary({
+        nabidka: result.data.nabidkaCount,
+        poptavka: result.data.poptavkaCount,
+        savedNabidka: result.data.savedNabidkaCount,
+        savedPoptavka: result.data.savedPoptavkaCount,
+        healthWarning: result.data.healthWarning || '',
+      });
       setAppState('scraping-done');
-      setProgress('Scraping finished. Ready to compare.');
+      setProgress('Scrapování dokončeno. Připraveno k porovnání.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setProgress(`Scraping failed: ${message}`);
+      const message = error instanceof Error ? error.message : 'Neznámá chyba';
+      setProgress(`Scrapování selhalo: ${message}`);
       setAppState('idle');
     }
 
@@ -115,7 +121,7 @@ const App = () => {
   const handleStartComparison = useCallback(async () => {
     setIsComparing(true);
     setAppState('comparing');
-    setProgress('Starting comparison process...');
+    setProgress('Spouštím porovnávání...');
 
     try {
       const response = await fetch('http://localhost:3001/compare', {
@@ -136,16 +142,16 @@ const App = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `Server responded with error ${response.status}`);
+        throw new Error(errorData.message || `Server vrátil chybu ${response.status}`);
       }
 
       const result = await response.json();
       setMatchedAds(result.data);
       setAppState('comparing-done');
-      setProgress(`Comparison finished. Found ${result.data.length} matches.`);
+      setProgress(`Porovnání dokončeno. Nalezeno ${result.data.length} shod.`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setProgress(`Comparison failed: ${message}`);
+      const message = error instanceof Error ? error.message : 'Neznámá chyba';
+      setProgress(`Porovnávání selhalo: ${message}`);
       setAppState('scraping-done');
     }
 

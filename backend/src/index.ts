@@ -322,6 +322,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
 
     const scrapedAds: any[] = [];
+    let savedAdsCount = 0;
     let currentPageUrl = url;
     let hasNextPage = true;
     let pagesScraped = 0;
@@ -334,11 +335,33 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
     const stopOnKnownAd = options?.stopOnKnownAd !== false;
     const maxAdsPerTypePerBrand = Math.max(1, Math.min(500, Number(options?.maxAdsPerTypePerBrand || 50)));
 
+    if (process.env.MOCK_SCRAPE === '1') {
+        for (let i = 0; i < Math.min(maxAdsPerTypePerBrand, 3); i++) {
+            const ad = {
+                id: randomUUID(),
+                title: `${brand} test ${adType} ${i + 1}`,
+                price: `${2000 + (i * 100)} Kč`,
+                link: `https://mock.local/${adType}/${brand.toLowerCase()}/${i + 1}`,
+                date_posted: 'Dnes',
+                brand,
+                ad_type: adType,
+                scraped_at: new Date().toISOString(),
+                description: `Testovací inzerát ${adType}`,
+                location: 'Praha',
+            };
+            const wasSaved = await saveAd(ad);
+            if (wasSaved) savedAdsCount += 1;
+            scrapedAds.push(ad);
+        }
 
-    pushRuntimeLog(`Starting scrape for ${brand} (${adType}) at ${url}`, 'system');
+        pushRuntimeLog(`MOCK režim: vytvořeno ${scrapedAds.length} inzerátů pro ${brand} (${adType}).`, 'system');
+        return { ads: scrapedAds, savedAdsCount };
+    }
+
+    pushRuntimeLog(`Spouštím scrapování pro ${brand} (${adType}) na ${url}`, 'system');
 
     while (scrapedAds.length < maxAdsPerTypePerBrand && hasNextPage && pagesScraped < 50) {
-        pushRuntimeLog(`Scraping page: ${currentPageUrl}`);
+        pushRuntimeLog(`Scrapuji stránku: ${currentPageUrl}`);
         pagesScraped++;
 
         try {
@@ -349,7 +372,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
 
             const items = $(selectors.item);
             if (items.length === 0) {
-                pushRuntimeLog('No items found on page. Stopping.', 'system');
+                pushRuntimeLog('Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.', 'system');
                 break;
             }
 
@@ -359,7 +382,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 const adDate = parseDate(adDateStr);
 
                 if (adDate && adDate < twoMonthsAgo) {
-                    pushRuntimeLog(`Found ad older than 2 months (${adDateStr}). Stopping.`, 'system');
+                    pushRuntimeLog(`Nalezen inzerát starší než 2 měsíce (${adDateStr}). Ukončuji.`, 'system');
                     shouldStop = true;
                     break;
                 }
@@ -407,7 +430,10 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 };
 
                 try {
-                    await saveAd(ad);
+                    const wasSaved = await saveAd(ad);
+                    if (wasSaved) {
+                        savedAdsCount += 1;
+                    }
                 } catch (err) {
                     console.error(`Failed to save ad ${ad.title}:`, err);
                 }
@@ -415,7 +441,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 scrapedAds.push(ad);
 
                 if (scrapedAds.length >= maxAdsPerTypePerBrand) {
-                    pushRuntimeLog(`Reached configured ads limit (${maxAdsPerTypePerBrand}). Stopping.`, 'system');
+                    pushRuntimeLog(`Dosažen nastavený limit inzerátů (${maxAdsPerTypePerBrand}). Ukončuji.`, 'system');
                     shouldStop = true;
                     break;
                 }
@@ -428,7 +454,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 currentPageUrl = new URL(nextPageLink, baseUrl).href;
             } else {
                 hasNextPage = false;
-                pushRuntimeLog('No next page link found. Stopping.', 'system');
+                pushRuntimeLog('Nebyl nalezen odkaz na další stránku. Ukončuji.', 'system');
             }
         } catch (error) {
             console.error(`Scraping failed completely for ${currentPageUrl} after retries. Preskakuji stránku.`);
@@ -447,15 +473,32 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
         await updateScrapeCheckpoint(brand, adType, latestSeenUrl, latestSeenDate);
     }
 
-    pushRuntimeLog(`Successfully scraped ${scrapedAds.length} ads. Saved to ${filePath}`, 'success');
-    return scrapedAds;
+    pushRuntimeLog(`Úspěšně načteno ${scrapedAds.length} inzerátů (${savedAdsCount} nových v DB). Uloženo do ${filePath}`, 'success');
+    return { ads: scrapedAds, savedAdsCount };
 }
+
+const getBrandSegment = (brand: string) => {
+    let segment = brand.toLowerCase().replace(/ /g, '-');
+    if (brand === 'Sony') {
+        segment = 'ericsson';
+    } else if (brand === 'Ostatní') {
+        segment = 'mobily';
+    }
+    return segment;
+};
+
+const getBazosBrandUrl = (brandSegment: string, adType: 'nabidka' | 'poptavka') => {
+    if (adType === 'poptavka') {
+        return `https://mobil.bazos.cz/koupim/${brandSegment}/`;
+    }
+    return `https://mobil.bazos.cz/${brandSegment}/`;
+};
 
 app.post('/scrape-all', async (req, res) => {
     const { selectors, scrapingOptions } = req.body;
 
     if (!selectors) {
-        return res.status(400).json({ message: 'Missing required configuration.' });
+        return res.status(400).json({ message: 'Chybí povinná konfigurace.' });
     }
 
     try {
@@ -463,41 +506,48 @@ app.post('/scrape-all', async (req, res) => {
             stopOnKnownAd: scrapingOptions?.stopOnKnownAd !== false,
             maxAdsPerTypePerBrand: Math.max(1, Math.min(500, Number(scrapingOptions?.maxAdsPerTypePerBrand || 50))),
         };
-        pushRuntimeLog(`Scrape options: stopOnKnownAd=${effectiveScrapingOptions.stopOnKnownAd}, maxAdsPerTypePerBrand=${effectiveScrapingOptions.maxAdsPerTypePerBrand}`, 'system');
+        pushRuntimeLog(`Nastavení scrapování: stopOnKnownAd=${effectiveScrapingOptions.stopOnKnownAd}, maxAdsPerTypePerBrand=${effectiveScrapingOptions.maxAdsPerTypePerBrand}`, 'system');
 
         const scrapedData: { nabidka: any[], poptavka: any[] } = { nabidka: [], poptavka: [] };
         let totalNabidka = 0;
         let totalPoptavka = 0;
+        let totalSavedNabidka = 0;
+        let totalSavedPoptavka = 0;
 
         for (const brand of BRANDS) {
-            pushRuntimeLog(`Scraping offers for ${brand}`, 'system');
-            let brandUrlSegment = brand.toLowerCase().replace(/ /g, '-');
-            if (brand === 'Sony') {
-                brandUrlSegment = 'ericsson';
-            } else if (brand === 'Ostatní') {
-                brandUrlSegment = 'mobily';
-            }
+            pushRuntimeLog(`Scrapuji nabídky pro ${brand}`, 'system');
+            const brandUrlSegment = getBrandSegment(brand);
 
-            const offerAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'nabidka', selectors, effectiveScrapingOptions);
-            scrapedData.nabidka.push(...offerAds);
-            totalNabidka += offerAds.length;
+            const offerResult = await scrapeUrl(getBazosBrandUrl(brandUrlSegment, 'nabidka'), brand, 'nabidka', selectors, effectiveScrapingOptions);
+            scrapedData.nabidka.push(...offerResult.ads);
+            totalNabidka += offerResult.ads.length;
+            totalSavedNabidka += offerResult.savedAdsCount;
 
-            pushRuntimeLog(`Scraping demands for ${brand}`, 'system');
-            const demandAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'poptavka', selectors, effectiveScrapingOptions);
-            scrapedData.poptavka.push(...demandAds);
-            totalPoptavka += demandAds.length;
+            pushRuntimeLog(`Scrapuji poptávky pro ${brand}`, 'system');
+            const demandResult = await scrapeUrl(getBazosBrandUrl(brandUrlSegment, 'poptavka'), brand, 'poptavka', selectors, effectiveScrapingOptions);
+            scrapedData.poptavka.push(...demandResult.ads);
+            totalPoptavka += demandResult.ads.length;
+            totalSavedPoptavka += demandResult.savedAdsCount;
         }
 
         res.json({
-            message: `Scraping complete! Found ${totalNabidka} offers and ${totalPoptavka} demands. All ads saved to database.`,
-            data: { nabidkaCount: totalNabidka, poptavkaCount: totalPoptavka },
+            message: `Scrapování dokončeno! Načteno ${totalNabidka} nabídek a ${totalPoptavka} poptávek; do DB uloženo ${totalSavedNabidka} nabídek a ${totalSavedPoptavka} poptávek.`,
+            data: {
+                nabidkaCount: totalNabidka,
+                poptavkaCount: totalPoptavka,
+                savedNabidkaCount: totalSavedNabidka,
+                savedPoptavkaCount: totalSavedPoptavka,
+                healthWarning: totalPoptavka > 0 && totalSavedPoptavka === 0
+                    ? 'Byly nalezeny poptávky, ale žádná se neuložila do DB. Zkontrolujte selektory, URL pro poptávku nebo duplicitní data.'
+                    : '',
+            },
         });
 
     } catch (error) {
-pushRuntimeLog(`Scraping error: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
-        console.error('An error occurred during scraping:', error);
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        res.status(500).json({ message: 'An error occurred during scraping.', error: errorMessage });
+pushRuntimeLog(`Chyba scrapování: ${error instanceof Error ? error.message : 'neznámá chyba'}`, 'error');
+        console.error('Během scrapování došlo k chybě:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Došlo k neznámé chybě';
+        res.status(500).json({ message: 'Během scrapování došlo k chybě.', error: errorMessage });
     }
 });
 
@@ -641,7 +691,7 @@ app.post('/export/csv', async (req, res) => {
 app.post('/compare', async (req, res) => {
     try {
         const foundMatches: any[] = [];
-        pushRuntimeLog('Comparison started.', 'system');
+        pushRuntimeLog('Porovnávání spuštěno.', 'system');
         const seenMatches = new Set<string>();
         const comparisonMethod = req.body.comparisonMethod || 'auto';
         const filterRules = req.body.filterRules || {};
@@ -660,11 +710,11 @@ app.post('/compare', async (req, res) => {
         const allOffers = await getAllAdsByType('nabidka');
         const allDemands = await getAllAdsByType('poptavka');
 
-        pushRuntimeLog(`Loaded dataset for comparison: offers=${allOffers.length}, demands=${allDemands.length}`);
+        pushRuntimeLog(`Načtená data pro porovnání: nabídky=${allOffers.length}, poptávky=${allDemands.length}`);
 
         if (allOffers.length === 0 || allDemands.length === 0) {
             return res.json({
-                message: 'Comparison complete! Not enough data in database to compare.',
+                message: 'Porovnání dokončeno! V databázi není dostatek dat pro porovnání.',
                 data: [],
             });
         }
@@ -682,7 +732,7 @@ app.post('/compare', async (req, res) => {
         });
 
         if (useAI) {
-            pushRuntimeLog('Processing offers with AI...', 'system');
+            pushRuntimeLog('Zpracovávám nabídky pomocí AI...', 'system');
             for (const offerAd of allOffers) {
                 const model = offerAd.model_ai || await extractModelWithAI(offerAd.title, offerAd.description);
                 if (model && !offerAd.model_ai) await updateAdModelAi(offerAd.id, model);
@@ -694,7 +744,7 @@ app.post('/compare', async (req, res) => {
                 }
                 enrichedOffers.push({ ...offerAd, model_ai: model, parsed_embedding: embeddingData });
             }
-            pushRuntimeLog('Processing demands with AI...', 'system');
+            pushRuntimeLog('Zpracovávám poptávky pomocí AI...', 'system');
             for (const demandAd of allDemands) {
                 const model = demandAd.model_ai || await extractModelWithAI(demandAd.title, demandAd.description);
                 if (model && !demandAd.model_ai) await updateAdModelAi(demandAd.id, model);
@@ -717,7 +767,7 @@ app.post('/compare', async (req, res) => {
         for (const demandAd of enrichedDemands) {
             processedDemands += 1;
             if (processedDemands % 50 === 0) {
-                pushRuntimeLog(`Comparison progress: processed ${processedDemands}/${enrichedDemands.length} demand ads, matches=${foundMatches.length}`);
+                pushRuntimeLog(`Průběh porovnání: zpracováno ${processedDemands}/${enrichedDemands.length} poptávek, shod=${foundMatches.length}`);
             }
             const demandPrice = parsePrice(demandAd.price);
             if (demandPrice === null) continue;
@@ -837,21 +887,21 @@ app.post('/compare', async (req, res) => {
 
         // Seřazení výsledků od nejvyššího potenciálního zisku (arbitrážního skóre)
         foundMatches.sort((a, b) => (b.realOpportunityScore - a.realOpportunityScore) || (b.arbitrageScore - a.arbitrageScore));
-        pushRuntimeLog(`Comparison finished. Found ${foundMatches.length} matches.`, foundMatches.length > 0 ? 'success' : 'system');
+        pushRuntimeLog(`Porovnání dokončeno. Nalezeno ${foundMatches.length} shod.`, foundMatches.length > 0 ? 'success' : 'system');
 
         res.json({
-            message: `Comparison complete! Found ${foundMatches.length} matches. ${useAI ? '(AI Powered Embeddings)' : '(Keyword Powered)'}`,
+            message: `Porovnání dokončeno! Nalezeno ${foundMatches.length} shod. ${useAI ? '(AI embeddingy)' : '(Klíčová slova)'}`,
             data: foundMatches,
         });
 
     } catch (error) {
-pushRuntimeLog(`Comparison error: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
-        console.error('An error occurred during comparison:', error);
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        res.status(500).json({ message: 'An error occurred during comparison.', error: errorMessage });
+pushRuntimeLog(`Chyba porovnávání: ${error instanceof Error ? error.message : 'neznámá chyba'}`, 'error');
+        console.error('Během porovnávání došlo k chybě:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Došlo k neznámé chybě';
+        res.status(500).json({ message: 'Během porovnávání došlo k chybě.', error: errorMessage });
     }
 });
 
 app.listen(port, () => {
-    pushRuntimeLog(`Backend server is running at http://localhost:${port}`, 'success');
+    pushRuntimeLog(`Backend server běží na adrese http://localhost:${port}`, 'success');
 });
