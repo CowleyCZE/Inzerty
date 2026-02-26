@@ -33,11 +33,17 @@ export const DEFAULT_CONFIG = {
   adType: AD_TYPE_OPTIONS[0].value,
   itemCount: ITEM_COUNT_OPTIONS[0],
   url: 'https://www.bazos.cz/mobily/',
+  scrapingOptions: {
+    stopOnKnownAd: true,
+    maxAdsPerTypePerBrand: 50,
+  },
   selectors: {
     item: '.inzeraty.inzeratyflex',
     title: '.nadpis',
     price: '.inzeratycena',
     date: '.velikost10',
     link: '.nadpis a',
+    description: '.popis',
+    location: '.inzeratylok',
   }
 };

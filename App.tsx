@@ -2,19 +2,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import ResultsDisplay from './components/ResultsDisplay';
 import MonitoringDashboard from './components/MonitoringDashboard';
-import { Ad, Config } from './types';
+import { Ad, Config, MatchItem } from './types';
 import { DEFAULT_CONFIG } from './constants.tsx';
 import ProgressDisplay from './components/ProgressDisplay';
 import ScrapeSummary from './components/ScrapeSummary';
-import MainInfo from './components/MainInfo';
+import LogPanel from './components/LogPanel';
 import SettingsPage from './components/SettingsPage';
 
 type AppView = 'dashboard' | 'settings';
 
 const App = () => {
-  const [config] = useState<Config>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<Config>(DEFAULT_CONFIG as Config);
   const [ads, setAds] = useState<Ad[]>([]);
-  const [matchedAds, setMatchedAds] = useState<{ offer: Ad, demand: Ad, arbitrageScore?: number }[]>([]);
+  const [matchedAds, setMatchedAds] = useState<MatchItem[]>([]);
   const [isScraping, setIsScraping] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
   const [scrapeSummary, setScrapeSummary] = useState<{ nabidka: number; poptavka: number } | null>(null);
@@ -23,6 +23,28 @@ const App = () => {
   const [ollamaActive, setOllamaActive] = useState(false);
   const [view, setView] = useState<AppView>('dashboard');
   const [lastScrapeDuration, setLastScrapeDuration] = useState<number | null>(null);
+  const [runtimeLogs, setRuntimeLogs] = useState<Array<{ id: string; timestamp: string; message: string; type: 'info' | 'success' | 'error' | 'system' }>>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchLogs = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/logs');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (mounted) setRuntimeLogs(Array.isArray(data.logs) ? data.logs : []);
+      } catch {
+        // ignore log polling errors
+      }
+    };
+
+    fetchLogs();
+    const timer = setInterval(fetchLogs, 1500);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const checkOllama = async () => {
@@ -67,7 +89,7 @@ const App = () => {
       const response = await fetch('http://localhost:3001/scrape-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectors: config.selectors }),
+        body: JSON.stringify({ selectors: config.selectors, scrapingOptions: config.scrapingOptions || { stopOnKnownAd: true, maxAdsPerTypePerBrand: 50 } }),
       });
 
       if (!response.ok) {
@@ -76,6 +98,7 @@ const App = () => {
       }
 
       const result = await response.json();
+      setAds(result.data.ads || []);
       setScrapeSummary({ nabidka: result.data.nabidkaCount, poptavka: result.data.poptavkaCount });
       setAppState('scraping-done');
       setProgress('Scraping finished. Ready to compare.');
@@ -98,7 +121,17 @@ const App = () => {
       const response = await fetch('http://localhost:3001/compare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comparisonMethod: (config as any).comparisonMethod || 'auto' }),
+        body: JSON.stringify({
+          comparisonMethod: config.comparisonMethod || 'auto',
+          filterRules: config.filterRules || {
+            blacklistTerms: [],
+            whitelistModels: [],
+            minPrice: null,
+            maxPrice: null,
+            minStorageGb: null,
+          },
+          hideResolved: true,
+        }),
       });
 
       if (!response.ok) {
@@ -139,14 +172,14 @@ const App = () => {
 
         {view === 'dashboard' ? (
           <>
-            <MainInfo />
+            <LogPanel logs={runtimeLogs} />
             <ProgressDisplay progress={progress} />
             {appState === 'scraping-done' && scrapeSummary && <ScrapeSummary summary={scrapeSummary} />}
             {matchedAds.length > 0 && <ResultsDisplay matchedAds={matchedAds} isLoading={isComparing} />}
             <MonitoringDashboard ads={ads} isScraping={isScraping || isComparing} lastScrapeDuration={lastScrapeDuration} />
           </>
         ) : (
-          <SettingsPage />
+          <SettingsPage config={config} setConfig={setConfig} />
         )}
 
         <footer className="mt-12 text-center text-sm text-slate-500 py-6 border-t border-slate-700">
