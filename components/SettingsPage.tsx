@@ -24,6 +24,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
     minStorageGb: null,
   };
 
+  const scrapingOptions = config.scrapingOptions || {
+    stopOnKnownAd: true,
+    maxAdsPerTypePerBrand: 50,
+  };
+
   const envSnippet = useMemo(() => {
     const lines = [
       `OLLAMA_URL=${ollamaUrl}`,
@@ -44,6 +49,42 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="space-y-4">
+          <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
+            <h3 className="font-semibold text-sky-300 mb-2">Nastavení scrapování</h3>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={scrapingOptions.stopOnKnownAd}
+                onChange={(e) => setConfig((prev) => ({
+                  ...prev,
+                  scrapingOptions: {
+                    stopOnKnownAd: e.target.checked,
+                    maxAdsPerTypePerBrand: prev.scrapingOptions?.maxAdsPerTypePerBrand ?? 50,
+                  },
+                }))}
+              />
+              Zastavit inkrementální scraping po nalezení již dříve staženého inzerátu
+            </label>
+            <p className="text-xs text-slate-400 mt-2">Pro testování můžete vypnout, aby scraper vždy pokračoval dál.</p>
+
+            <label className="block text-sm text-slate-300 mt-3 mb-1">Limit inzerátů na značku + typ (nabídka/poptávka)</label>
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={scrapingOptions.maxAdsPerTypePerBrand}
+              onChange={(e) => setConfig((prev) => ({
+                ...prev,
+                scrapingOptions: {
+                  stopOnKnownAd: prev.scrapingOptions?.stopOnKnownAd ?? true,
+                  maxAdsPerTypePerBrand: Math.max(1, Number(e.target.value) || 50),
+                },
+              }))}
+              className="w-full bg-slate-700 border border-slate-600 rounded p-2 text-sm"
+            />
+          </div>
+
+
           <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
             <h3 className="font-semibold text-sky-300 mb-2">Blacklist / whitelist pravidla</h3>
             <label className="block text-sm text-slate-300 mb-1">Blacklist výrazů (oddělené čárkou)</label>
