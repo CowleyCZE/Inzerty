@@ -89,7 +89,7 @@ const App = () => {
       const response = await fetch('http://localhost:3001/scrape-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectors: config.selectors }),
+        body: JSON.stringify({ selectors: config.selectors, scrapingOptions: config.scrapingOptions || { stopOnKnownAd: true, maxAdsPerTypePerBrand: 50 } }),
       });
 
       if (!response.ok) {

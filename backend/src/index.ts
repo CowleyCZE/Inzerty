@@ -317,7 +317,7 @@ const getEmbeddingFromOllama = async (text: string): Promise<number[] | null> =>
     }
 };
 
-async function scrapeUrl(url: string, brand: string, adType: string, selectors: any) {
+async function scrapeUrl(url: string, brand: string, adType: string, selectors: any, options?: { stopOnKnownAd?: boolean; maxAdsPerTypePerBrand?: number }) {
     const twoMonthsAgo = new Date();
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
 
@@ -331,6 +331,9 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
     const checkpointDate = checkpoint?.lastSeenDate ? parseDate(checkpoint.lastSeenDate) : null;
     let latestSeenUrl: string | null = null;
     let latestSeenDate: string | null = null;
+    const stopOnKnownAd = options?.stopOnKnownAd !== false;
+    const maxAdsPerTypePerBrand = Math.max(1, Math.min(500, Number(options?.maxAdsPerTypePerBrand || 50)));
+
 
     pushRuntimeLog(`Starting scrape for ${brand} (${adType}) at ${url}`, 'system');
 
@@ -449,13 +452,19 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
 }
 
 app.post('/scrape-all', async (req, res) => {
-    const { selectors } = req.body;
+    const { selectors, scrapingOptions } = req.body;
 
     if (!selectors) {
         return res.status(400).json({ message: 'Missing required configuration.' });
     }
 
     try {
+        const effectiveScrapingOptions = {
+            stopOnKnownAd: scrapingOptions?.stopOnKnownAd !== false,
+            maxAdsPerTypePerBrand: Math.max(1, Math.min(500, Number(scrapingOptions?.maxAdsPerTypePerBrand || 50))),
+        };
+        pushRuntimeLog(`Scrape options: stopOnKnownAd=${effectiveScrapingOptions.stopOnKnownAd}, maxAdsPerTypePerBrand=${effectiveScrapingOptions.maxAdsPerTypePerBrand}`, 'system');
+
         const scrapedData: { nabidka: any[], poptavka: any[] } = { nabidka: [], poptavka: [] };
         let totalNabidka = 0;
         let totalPoptavka = 0;
@@ -469,7 +478,7 @@ app.post('/scrape-all', async (req, res) => {
                 brandUrlSegment = 'mobily';
             }
 
-            const offerAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'nabidka', selectors);
+            const offerAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'nabidka', selectors, effectiveScrapingOptions);
             scrapedData.nabidka.push(...offerAds);
             totalNabidka += offerAds.length;
 
