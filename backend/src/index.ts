@@ -337,7 +337,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
 
     pushRuntimeLog(`Starting scrape for ${brand} (${adType}) at ${url}`, 'system');
 
-    while (scrapedAds.length < maxAdsPerTypePerBrand && hasNextPage && pagesScraped < 50) {
+    while (scrapedAds.length < 50 && hasNextPage && pagesScraped < 50) {
         pushRuntimeLog(`Scraping page: ${currentPageUrl}`);
         pagesScraped++;
 
@@ -364,7 +364,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                     break;
                 }
 
-                if (stopOnKnownAd && checkpointDate && adDate && adDate <= checkpointDate) {
+                if (checkpointDate && adDate && adDate <= checkpointDate) {
                     pushRuntimeLog(`Narazili jsme na inzerát starší nebo stejný jako checkpoint (${adDateStr}). Inkrementální scraping končí.`, 'system');
                     shouldStop = true;
                     break;
@@ -373,13 +373,13 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 const link = $(element).find(selectors.link).attr('href');
                 const fullLink = link && !link.startsWith('http') ? `${baseUrl}${link}` : link;
                 
-                if (stopOnKnownAd && fullLink && checkpoint?.lastSeenUrl && fullLink === checkpoint.lastSeenUrl) {
+                if (fullLink && checkpoint?.lastSeenUrl && fullLink === checkpoint.lastSeenUrl) {
                     pushRuntimeLog(`Dosažen uložený checkpoint URL pro ${brand}. Inkrementální scraping končí.`, 'system');
                     shouldStop = true;
                     break;
                 }
 
-                if (stopOnKnownAd && fullLink && recentUrls.includes(fullLink)) {
+                if (fullLink && recentUrls.includes(fullLink)) {
                     pushRuntimeLog(`Inzerát ${fullLink} již byl dříve stažen. Skript končí inkrementální stahování pro ${brand}.`, 'system');
                     shouldStop = true;
                     break;
@@ -414,8 +414,8 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
 
                 scrapedAds.push(ad);
 
-                if (scrapedAds.length >= maxAdsPerTypePerBrand) {
-                    pushRuntimeLog(`Reached configured ads limit (${maxAdsPerTypePerBrand}). Stopping.`, 'system');
+                if (scrapedAds.length >= 50) {
+                    pushRuntimeLog('Reached 50 ads limit. Stopping.', 'system');
                     shouldStop = true;
                     break;
                 }
@@ -483,7 +483,7 @@ app.post('/scrape-all', async (req, res) => {
             totalNabidka += offerAds.length;
 
             pushRuntimeLog(`Scraping demands for ${brand}`, 'system');
-            const demandAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'poptavka', selectors, effectiveScrapingOptions);
+            const demandAds = await scrapeUrl(`https://mobil.bazos.cz/${brandUrlSegment}/`, brand, 'poptavka', selectors);
             scrapedData.poptavka.push(...demandAds);
             totalPoptavka += demandAds.length;
         }
