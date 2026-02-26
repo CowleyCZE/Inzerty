@@ -1,22 +1,30 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Config } from '../types';
 
 interface SettingsPageProps {
   config: Config;
-  setConfig: React.Dispatch<React.SetStateAction<Config>>;
+  onSave: (nextConfig: Config) => Promise<void>;
+  onClearDatabase: () => Promise<void>;
 }
 
 const parseList = (raw: string) => raw.split(',').map((s) => s.trim()).filter(Boolean);
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ config, onSave, onClearDatabase }) => {
+  const [draft, setDraft] = useState<Config>(config);
   const [usePostgres, setUsePostgres] = useState(false);
   const [useProxy, setUseProxy] = useState(false);
-  const [ollamaModel, setOllamaModel] = useState('llama3.2:1b');
   const [postgresUrl, setPostgresUrl] = useState('postgresql://postgres:heslo@localhost:5432/inzerty');
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
   const [proxyPool, setProxyPool] = useState('http://user:pass@proxy1:8080,http://proxy2:8080');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isClearingDb, setIsClearingDb] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
-  const filterRules = config.filterRules || {
+  useEffect(() => {
+    setDraft(config);
+  }, [config]);
+
+  const filterRules = draft.filterRules || {
     blacklistTerms: [],
     whitelistModels: [],
     minPrice: null,
@@ -24,7 +32,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
     minStorageGb: null,
   };
 
-  const scrapingOptions = config.scrapingOptions || {
+  const scrapingOptions = draft.scrapingOptions || {
     stopOnKnownAd: true,
     maxAdsPerTypePerBrand: 50,
   };
@@ -32,15 +40,45 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
   const envSnippet = useMemo(() => {
     const lines = [
       `OLLAMA_URL=${ollamaUrl}`,
+      `OLLAMA_MODEL=${draft.ollamaModel || 'all-minilm:22m'}`,
       usePostgres ? 'DB_CLIENT=postgres' : 'DB_CLIENT=sqlite',
       usePostgres ? `DATABASE_URL=${postgresUrl}` : '# DATABASE_URL není potřeba pro SQLite',
       useProxy ? `SCRAPER_PROXY_URLS=${proxyPool}` : '# SCRAPER_PROXY_URLS (volitelné)',
     ];
     return lines.join('\n');
-  }, [usePostgres, useProxy, ollamaUrl, postgresUrl, proxyPool]);
+  }, [draft.ollamaModel, usePostgres, useProxy, ollamaUrl, postgresUrl, proxyPool]);
 
   const updateRules = (patch: Partial<typeof filterRules>) => {
-    setConfig((prev) => ({ ...prev, filterRules: { ...filterRules, ...patch } }));
+    setDraft((prev) => ({ ...prev, filterRules: { ...filterRules, ...patch } }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setStatusMessage('');
+    try {
+      await onSave(draft);
+      setStatusMessage('Nastavení bylo úspěšně uloženo.');
+    } catch (error) {
+      setStatusMessage(`Uložení selhalo: ${error instanceof Error ? error.message : 'Neznámá chyba'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClearDb = async () => {
+    const confirmed = window.confirm('Opravdu chcete vymazat databázi? Tato akce je nevratná.');
+    if (!confirmed) return;
+
+    setIsClearingDb(true);
+    setStatusMessage('');
+    try {
+      await onClearDatabase();
+      setStatusMessage('Databáze byla vymazána.');
+    } catch (error) {
+      setStatusMessage(`Mazání databáze selhalo: ${error instanceof Error ? error.message : 'Neznámá chyba'}`);
+    } finally {
+      setIsClearingDb(false);
+    }
   };
 
   return (
@@ -55,7 +93,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
               <input
                 type="checkbox"
                 checked={scrapingOptions.stopOnKnownAd}
-                onChange={(e) => setConfig((prev) => ({
+                onChange={(e) => setDraft((prev) => ({
                   ...prev,
                   scrapingOptions: {
                     stopOnKnownAd: e.target.checked,
@@ -73,7 +111,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
               min={1}
               max={500}
               value={scrapingOptions.maxAdsPerTypePerBrand}
-              onChange={(e) => setConfig((prev) => ({
+              onChange={(e) => setDraft((prev) => ({
                 ...prev,
                 scrapingOptions: {
                   stopOnKnownAd: prev.scrapingOptions?.stopOnKnownAd ?? true,
@@ -83,7 +121,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
               className="w-full bg-slate-700 border border-slate-600 rounded p-2 text-sm"
             />
           </div>
-
 
           <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
             <h3 className="font-semibold text-sky-300 mb-2">Blacklist / whitelist pravidla</h3>
@@ -103,7 +140,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
             <label className="block text-sm text-slate-300 mb-1">URL Ollama</label>
             <input value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded p-2 text-sm" />
             <label className="block text-sm text-slate-300 mt-3 mb-1">Model</label>
-            <input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded p-2 text-sm" />
+            <input value={draft.ollamaModel || ''} onChange={(e) => setDraft((prev) => ({ ...prev, ollamaModel: e.target.value }))} className="w-full bg-slate-700 border border-slate-600 rounded p-2 text-sm" />
+            <p className="text-xs text-slate-400 mt-2">Výchozí model je nastaven na all-minilm:22m.</p>
           </div>
 
           <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
@@ -112,6 +150,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, setConfig }) => {
             {usePostgres && <input value={postgresUrl} onChange={(e) => setPostgresUrl(e.target.value)} className="mt-2 w-full bg-slate-700 border border-slate-600 rounded p-2 text-sm" />}
             <label className="inline-flex items-center gap-2 text-sm text-slate-300 mt-3"><input type="checkbox" checked={useProxy} onChange={(e) => setUseProxy(e.target.checked)} /> Použít proxy pool</label>
             {useProxy && <textarea value={proxyPool} onChange={(e) => setProxyPool(e.target.value)} rows={3} className="mt-2 w-full bg-slate-700 border border-slate-600 rounded p-2 text-sm" />}
+
+            <button
+              onClick={handleClearDb}
+              disabled={isClearingDb}
+              className="mt-4 bg-rose-700 hover:bg-rose-800 disabled:bg-rose-900 text-white text-sm font-semibold py-2 px-3 rounded"
+            >
+              {isClearingDb ? 'Mažu databázi...' : 'Vymazat databáze'}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button onClick={handleSave} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-900 text-white font-semibold py-2 px-4 rounded-lg">
+              {isSaving ? 'Ukládám...' : 'Uložit'}
+            </button>
+            {statusMessage && <p className="text-sm text-slate-300">{statusMessage}</p>}
           </div>
         </div>
 

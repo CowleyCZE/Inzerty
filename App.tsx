@@ -10,6 +10,7 @@ import LogPanel from './components/LogPanel';
 import SettingsPage from './components/SettingsPage';
 
 type AppView = 'dashboard' | 'settings';
+const SETTINGS_STORAGE_KEY = 'inzerty_settings_v1';
 
 const App = () => {
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG as Config);
@@ -17,6 +18,7 @@ const App = () => {
   const [matchedAds, setMatchedAds] = useState<MatchItem[]>([]);
   const [isScraping, setIsScraping] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
+  const [isTogglingOllama, setIsTogglingOllama] = useState(false);
   const [scrapeSummary, setScrapeSummary] = useState<ScrapeSummaryData | null>(null);
   const [progress, setProgress] = useState('Připraveno ke spuštění.');
   const [appState, setAppState] = useState('idle');
@@ -24,6 +26,44 @@ const App = () => {
   const [view, setView] = useState<AppView>('dashboard');
   const [lastScrapeDuration, setLastScrapeDuration] = useState<number | null>(null);
   const [runtimeLogs, setRuntimeLogs] = useState<Array<{ id: string; timestamp: string; message: string; type: 'info' | 'success' | 'error' | 'system' }>>([]);
+
+  const refreshOllamaStatus = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:3001/ollama/status');
+      const data = await res.json();
+      setOllamaActive(Boolean(data.status));
+      return Boolean(data.status);
+    } catch {
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      setConfig((prev) => ({ ...prev, ...parsed }));
+    } catch {
+      // ignore invalid local settings
+    }
+  }, []);
+
+  useEffect(() => {
+    const loadServerSettings = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/settings');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.ollamaModel === 'string' && data.ollamaModel.trim()) {
+          setConfig((prev) => ({ ...prev, ollamaModel: data.ollamaModel.trim() }));
+        }
+      } catch {
+        // settings endpoint may be unavailable
+      }
+    };
+    loadServerSettings();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -47,20 +87,12 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const checkOllama = async () => {
-      try {
-        const res = await fetch('http://localhost:3001/ollama/status');
-        const data = await res.json();
-        setOllamaActive(data.status);
-      } catch {
-        console.error('Nepodařilo se ověřit stav Ollama serveru');
-      }
-    };
-    checkOllama();
-  }, []);
+    refreshOllamaStatus().catch(() => undefined);
+  }, [refreshOllamaStatus]);
 
   const toggleOllama = async () => {
     try {
+      setIsTogglingOllama(true);
       const action = ollamaActive ? 'stop' : 'start';
       setProgress(`${action === 'start' ? 'Spouštím' : 'Zastavuji'} server Ollama...`);
       const res = await fetch('http://localhost:3001/ollama/toggle', {
@@ -69,12 +101,50 @@ const App = () => {
         body: JSON.stringify({ action })
       });
       const data = await res.json();
-      setOllamaActive(data.status);
-      setProgress(data.message);
+      const verifiedStatus = await refreshOllamaStatus();
+      setOllamaActive(verifiedStatus);
+      setProgress(typeof data.message === 'string' ? data.message : verifiedStatus ? 'Ollama běží.' : 'Ollama je vypnutá.');
     } catch {
       setProgress('Nepodařilo se změnit stav Ollama serveru.');
+    } finally {
+      setIsTogglingOllama(false);
     }
   };
+
+  const handleSaveSettings = useCallback(async (nextConfig: Config) => {
+    setConfig(nextConfig);
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(nextConfig));
+
+    try {
+      const response = await fetch('http://localhost:3001/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ollamaModel: nextConfig.ollamaModel || 'all-minilm:22m' }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.message || 'Uložení nastavení selhalo.');
+      }
+
+      setProgress(payload.message || 'Nastavení bylo uloženo.');
+    } catch (error) {
+      setProgress(`Nastavení lokálně uloženo, ale synchronizace se serverem selhala: ${error instanceof Error ? error.message : 'Neznámá chyba'}`);
+    }
+  }, []);
+
+  const handleClearDatabase = useCallback(async () => {
+    const response = await fetch('http://localhost:3001/database/clear', { method: 'POST' });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.message || 'Mazání databáze selhalo.');
+    }
+
+    setAds([]);
+    setMatchedAds([]);
+    setScrapeSummary(null);
+    setProgress(payload.message || 'Databáze byla vymazána.');
+  }, []);
 
   const handleStartScraping = useCallback(async () => {
     setIsScraping(true);
@@ -168,6 +238,7 @@ const App = () => {
         appState={appState}
         ollamaActive={ollamaActive}
         onToggleOllama={toggleOllama}
+        isTogglingOllama={isTogglingOllama}
       />
 
       <div className="flex-1 p-4 md:p-8 overflow-y-auto">
@@ -185,7 +256,7 @@ const App = () => {
             <MonitoringDashboard ads={ads} isScraping={isScraping || isComparing} lastScrapeDuration={lastScrapeDuration} />
           </>
         ) : (
-          <SettingsPage config={config} setConfig={setConfig} />
+          <SettingsPage config={config} onSave={handleSaveSettings} onClearDatabase={handleClearDatabase} />
         )}
 
         <footer className="mt-12 text-center text-sm text-slate-500 py-6 border-t border-slate-700">

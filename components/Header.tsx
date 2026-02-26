@@ -8,16 +8,18 @@ interface HeaderProps {
   appState: string;
   ollamaActive: boolean;
   onToggleOllama: () => void;
+  isTogglingOllama: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  onStartScraping, 
-  isScraping, 
-  onStartComparison, 
-  isComparing, 
+const Header: React.FC<HeaderProps> = ({
+  onStartScraping,
+  isScraping,
+  onStartComparison,
+  isComparing,
   appState,
   ollamaActive,
-  onToggleOllama
+  onToggleOllama,
+  isTogglingOllama,
 }) => {
   return (
     <header className="bg-slate-800 p-6 shadow-lg sticky top-0 z-50">
@@ -33,14 +35,15 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center space-x-4">
           <button
             onClick={onToggleOllama}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-semibold transition-colors duration-300 ${
-              ollamaActive 
-                ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+            disabled={isTogglingOllama}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-semibold transition-colors duration-300 disabled:cursor-not-allowed ${
+              ollamaActive
+                ? 'bg-purple-600 hover:bg-purple-700 text-white disabled:bg-purple-800'
+                : 'bg-slate-700 hover:bg-slate-600 text-slate-300 disabled:bg-slate-800'
             }`}
           >
             <span className={`w-2 h-2 rounded-full ${ollamaActive ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`}></span>
-            <span>{ollamaActive ? 'AI Server ON' : 'AI Server OFF'}</span>
+            <span>{isTogglingOllama ? 'AI Server...' : ollamaActive ? 'AI Server ON' : 'AI Server OFF'}</span>
           </button>
 
           {appState === 'idle' && (
@@ -61,9 +64,7 @@ const Header: React.FC<HeaderProps> = ({
               {isComparing ? 'Comparing...' : 'Start Comparison'}
             </button>
           )}
-          <div className="text-sm text-slate-400">
-            Simulace & Vizualizace
-          </div>
+          <div className="text-sm text-slate-400">Simulace & Vizualizace</div>
         </div>
       </div>
     </header>

@@ -64,6 +64,7 @@ export interface Config {
   itemCount: number;
   url: string;
   comparisonMethod?: string;
+  ollamaModel?: string;
   scrapingOptions?: {
     stopOnKnownAd: boolean;
     maxAdsPerTypePerBrand: number;
