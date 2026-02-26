@@ -487,11 +487,16 @@ const getBrandSegment = (brand: string) => {
     return segment;
 };
 
-const getBazosBrandUrl = (brandSegment: string, adType: 'nabidka' | 'poptavka') => {
-    if (adType === 'poptavka') {
-        return `https://mobil.bazos.cz/koupim/${brandSegment}/`;
+const getBazosBrandUrls = (brand: string, brandSegment: string, adType: 'nabidka' | 'poptavka') => {
+    if (adType === 'nabidka') {
+        return [`https://mobil.bazos.cz/${brandSegment}/`];
     }
-    return `https://mobil.bazos.cz/${brandSegment}/`;
+
+    const demandSearch = encodeURIComponent(brand.toLowerCase());
+    return [
+        `https://mobil.bazos.cz/koupim/${brandSegment}/`,
+        `https://mobil.bazos.cz/koupim/?hledat=${demandSearch}`,
+    ];
 };
 
 app.post('/scrape-all', async (req, res) => {
@@ -518,13 +523,28 @@ app.post('/scrape-all', async (req, res) => {
             pushRuntimeLog(`Scrapuji nabídky pro ${brand}`, 'system');
             const brandUrlSegment = getBrandSegment(brand);
 
-            const offerResult = await scrapeUrl(getBazosBrandUrl(brandUrlSegment, 'nabidka'), brand, 'nabidka', selectors, effectiveScrapingOptions);
+            const offerUrl = getBazosBrandUrls(brand, brandUrlSegment, 'nabidka')[0] || `https://mobil.bazos.cz/${brandUrlSegment}/`;
+            const offerResult = await scrapeUrl(offerUrl, brand, 'nabidka', selectors, effectiveScrapingOptions);
             scrapedData.nabidka.push(...offerResult.ads);
             totalNabidka += offerResult.ads.length;
             totalSavedNabidka += offerResult.savedAdsCount;
 
             pushRuntimeLog(`Scrapuji poptávky pro ${brand}`, 'system');
-            const demandResult = await scrapeUrl(getBazosBrandUrl(brandUrlSegment, 'poptavka'), brand, 'poptavka', selectors, effectiveScrapingOptions);
+            const demandUrls = getBazosBrandUrls(brand, brandUrlSegment, 'poptavka');
+            let demandResult = { ads: [] as any[], savedAdsCount: 0 };
+
+            for (let i = 0; i < demandUrls.length; i++) {
+                const demandUrl = demandUrls[i] ?? ''; 
+                if (!demandUrl) continue;
+
+                demandResult = await scrapeUrl(demandUrl, brand, 'poptavka', selectors, effectiveScrapingOptions);
+                if (demandResult.ads.length > 0 || i === demandUrls.length - 1) {
+                    break;
+                }
+
+                pushRuntimeLog(`Poptávky pro ${brand} z URL ${demandUrl} nebyly načteny. Zkouším fallback URL.`, 'info');
+            }
+
             scrapedData.poptavka.push(...demandResult.ads);
             totalPoptavka += demandResult.ads.length;
             totalSavedPoptavka += demandResult.savedAdsCount;
