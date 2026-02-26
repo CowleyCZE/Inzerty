@@ -314,7 +314,46 @@ const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 };
 
+let hasLoggedGenerateUnsupportedWarning = false;
+
+const isEmbeddingOnlyModel = (modelName: string): boolean => {
+    const normalized = modelName.toLowerCase();
+    return normalized.includes('embed') || normalized.includes('minilm') || normalized.includes('e5') || normalized.includes('bge');
+};
+
+const extractModelHeuristic = (title: string, description: string): string => {
+    const text = `${title} ${description}`;
+    const compact = text
+        .replace(/["“”]/g, ' ')
+        .replace(/[,+]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const storageMatch = compact.match(/(\d{2,4})\s*GB\b/i);
+    const storage = storageMatch && storageMatch[1] ? `${storageMatch[1]}GB` : '';
+
+    const iphoneMatch = compact.match(/iPhone\s*(\d{1,2}(?:\s*(?:Pro|Max|Plus|Mini))?)/i);
+    if (iphoneMatch && iphoneMatch[1]) {
+        return `iPhone ${iphoneMatch[1].replace(/\s+/g, ' ').trim()} ${storage}`.trim();
+    }
+
+    const androidMatch = compact.match(/\b((?:Galaxy\s+[A-Za-z0-9+]+|Redmi\s+[A-Za-z0-9+]+|Mi\s+[A-Za-z0-9+]+|Note\s+\d+[A-Za-z0-9+]*|Poco\s+[A-Za-z0-9+]+|Pixel\s+[A-Za-z0-9+]+|Moto\s+[A-Za-z0-9+]+|Xperia\s+[A-Za-z0-9+]+))\b/i);
+    if (androidMatch && androidMatch[1]) {
+        return `${androidMatch[1].replace(/\s+/g, ' ').trim()} ${storage}`.trim();
+    }
+
+    return storage;
+};
+
 const extractModelWithAI = async (title: string, description: string): Promise<string> => {
+    if (isEmbeddingOnlyModel(ollamaModel)) {
+        if (!hasLoggedGenerateUnsupportedWarning) {
+            pushRuntimeLog(`Ollama model \"${ollamaModel}\" je embedding-only. Přeskakuji /api/generate a používám heuristickou extrakci modelu.`, 'system');
+            hasLoggedGenerateUnsupportedWarning = true;
+        }
+        return extractModelHeuristic(title, description);
+    }
+
     try {
         const prompt = `Extract only the specific mobile phone model name and its storage capacity (in GB) from this ad. 
         Format: "Model Name GB". Exclude brand. 
@@ -331,8 +370,20 @@ const extractModelWithAI = async (title: string, description: string): Promise<s
 
         return response.data.response.trim();
     } catch (error) {
-        console.error('AI Extraction failed:', error);
-        return '';
+        if (axios.isAxiosError(error)) {
+            const details = String(error.response?.data?.error || '').toLowerCase();
+            if (details.includes('does not support generate')) {
+                if (!hasLoggedGenerateUnsupportedWarning) {
+                    pushRuntimeLog(`Ollama model \"${ollamaModel}\" nepodporuje /api/generate. Používám heuristickou extrakci modelu.`, 'system');
+                    hasLoggedGenerateUnsupportedWarning = true;
+                }
+                return extractModelHeuristic(title, description);
+            }
+            console.error('AI Extraction failed:', error.message, error.response?.data || '');
+        } else {
+            console.error('AI Extraction failed:', error);
+        }
+        return extractModelHeuristic(title, description);
     }
 };
 
