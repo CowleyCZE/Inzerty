@@ -415,7 +415,7 @@ async function scrapeUrl(url: string, brand: string, adType: string, selectors: 
                 scrapedAds.push(ad);
 
                 if (scrapedAds.length >= maxAdsPerTypePerBrand) {
-                    pushRuntimeLog(`Reached configured ads limit 
+                    pushRuntimeLog(`Reached configured ads limit (${maxAdsPerTypePerBrand}). Stopping.`, 'system');
                     shouldStop = true;
                     break;
                 }
