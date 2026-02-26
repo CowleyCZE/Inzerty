@@ -597,3 +597,21 @@ export const getDailyMetaStats = async () => {
     FROM match_meta`, [today, today, today]);
   return row || { new_count: 0, contacted_count: 0, closed_count: 0 };
 };
+
+export const clearDatabase = async () => {
+  await initDb();
+
+  if (DB_CLIENT === 'postgres') {
+    const pool = getPgPool();
+    await pool.query('TRUNCATE TABLE matches, match_meta, scrape_checkpoints, ads RESTART IDENTITY CASCADE');
+    return;
+  }
+
+  const db = await getSqliteDb();
+  await db.exec(`
+    DELETE FROM matches;
+    DELETE FROM match_meta;
+    DELETE FROM scrape_checkpoints;
+    DELETE FROM ads;
+  `);
+};

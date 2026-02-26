@@ -33,6 +33,8 @@ export const DEFAULT_CONFIG = {
   adType: AD_TYPE_OPTIONS[0].value,
   itemCount: ITEM_COUNT_OPTIONS[0],
   url: 'https://www.bazos.cz/mobily/',
+  comparisonMethod: 'auto',
+  ollamaModel: 'all-minilm:22m',
   scrapingOptions: {
     stopOnKnownAd: true,
     maxAdsPerTypePerBrand: 50,

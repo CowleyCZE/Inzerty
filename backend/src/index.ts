@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
-import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities, saveMatchMeta, getResolvedMatchKeys, getDailyMetaStats } from './database.js';
+import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities, saveMatchMeta, getResolvedMatchKeys, getDailyMetaStats, clearDatabase } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +17,7 @@ const port = 3001;
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const isLocalOllama = OLLAMA_BASE_URL.includes('localhost') || OLLAMA_BASE_URL.includes('127.0.0.1');
+let ollamaModel = process.env.OLLAMA_MODEL || 'all-minilm:22m';
 
 initDb().catch(console.error);
 
@@ -117,6 +118,37 @@ app.post('/ollama/toggle', async (req, res) => {
 app.get('/ollama/status', async (req, res) => {
     const running = await checkOllamaStatus();
     res.json({ status: running });
+});
+
+app.get('/settings', (req, res) => {
+    res.json({
+        ollamaUrl: OLLAMA_BASE_URL,
+        ollamaModel,
+    });
+});
+
+app.post('/settings', (req, res) => {
+    const requestedModel = typeof req.body?.ollamaModel === 'string' ? req.body.ollamaModel.trim() : '';
+
+    if (!requestedModel) {
+        return res.status(400).json({ message: 'Model Ollama je povinný.' });
+    }
+
+    ollamaModel = requestedModel;
+    return res.json({
+        message: `Model Ollama byl uložen: ${ollamaModel}`,
+        ollamaModel,
+    });
+});
+
+app.post('/database/clear', async (req, res) => {
+    try {
+        await clearDatabase();
+        return res.json({ message: 'Databáze byla vymazána.' });
+    } catch (error) {
+        console.error('Chyba při mazání databáze:', error);
+        return res.status(500).json({ message: 'Mazání databáze selhalo.' });
+    }
 });
 
 
@@ -292,7 +324,7 @@ const extractModelWithAI = async (title: string, description: string): Promise<s
         Model:`;
 
         const response = await axios.post(`${OLLAMA_BASE_URL}/api/generate`, {
-            model: 'llama3.2:1b',
+            model: ollamaModel,
             prompt: prompt,
             stream: false
         }, { timeout: 10000 });
@@ -307,7 +339,7 @@ const extractModelWithAI = async (title: string, description: string): Promise<s
 const getEmbeddingFromOllama = async (text: string): Promise<number[] | null> => {
     try {
         const response = await axios.post(`${OLLAMA_BASE_URL}/api/embeddings`, {
-            model: 'llama3.2:1b',
+            model: ollamaModel,
             prompt: text
         }, { timeout: 15000 });
         return response.data.embedding;
@@ -493,10 +525,7 @@ const getBazosBrandUrls = (brand: string, brandSegment: string, adType: 'nabidka
     }
 
     const demandSearch = encodeURIComponent(brand.toLowerCase());
-    return [
-        `https://mobil.bazos.cz/koupim/${brandSegment}/`,
-        `https://mobil.bazos.cz/koupim/?hledat=${demandSearch}`,
-    ];
+    return [`https://mobil.bazos.cz/koupim/?hledat=${demandSearch}`];
 };
 
 app.post('/scrape-all', async (req, res) => {
