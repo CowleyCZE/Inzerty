@@ -4875,12 +4875,13 @@ const startServer = () => {
 
 startServer();
 
-// Heartbeat log to monitor stability
-setInterval(() => {
-    if (process.env.NODE_ENV !== 'test') {
-        pushRuntimeLog('Backend heartbeat - server běží v pořádku', 'system');
-    }
-}, 5 * 60 * 1000); // Každých 5 minut
+// Heartbeat log to monitor stability (každých 5 minut)
+// setInterval(() => {
+//     if (process.env.NODE_ENV !== 'test') {
+//         pushRuntimeLog('Backend heartbeat - server běží v pořádku', 'system');
+//     }
+// }, 5 * 60 * 1000);
 
-// Keep process alive if needed (though Express should keep it alive)
-// process.stdin.resume();
+// Keep process alive - toto je nutné aby process neukončil hned po startu
+process.stdin.resume();
+process.stdout.write('Backend running...\n');

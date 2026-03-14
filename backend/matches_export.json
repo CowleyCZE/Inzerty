@@ -1,0 +1,182 @@
+{
+  "timestamp": "2026-03-14T18:02:24.353Z",
+  "totalMatches": 8,
+  "matches": [
+    {
+      "offer": {
+        "title": "APPLE IPHONE 17 256 GB ČERNÝ,2 ROKY ZÁRUKA,NOVÝ,NEROZBALENÝ",
+        "price": "19 990 Kč",
+        "location": "Praha 9190 00",
+        "url": "https://mobil.bazos.cz/inzerat/216083543/apple-iphone-17-256-gb-cerny2-roky-zarukanovynerozbaleny.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "Koupím iPhone 17-17 pro max",
+        "price": "25 000 Kč",
+        "location": "Louny440 01",
+        "url": "https://mobil.bazos.cz/inzerat/216174759/koupim-iphone-17-17-pro-max.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 5010,
+      "similarityScore": 100,
+      "realOpportunityScore": 55,
+      "expectedNetProfit": 4610,
+      "locationScore": 35,
+      "priceTrustScore": 5
+    },
+    {
+      "offer": {
+        "title": "iPhone 16 Pro 256Gb Desert Titanium",
+        "price": "18 000 Kč",
+        "location": "Nymburk289 24",
+        "url": "https://mobil.bazos.cz/inzerat/216209579/iphone-16-pro-256gb-desert-titanium.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "Iphone 16 pro 256gb Black Titan Koupím",
+        "price": "22 000 Kč",
+        "location": "Třebíč675 73",
+        "url": "https://mobil.bazos.cz/inzerat/213792380/iphone-16-pro-256gb-black-titan-koupim.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 4000,
+      "similarityScore": 100,
+      "realOpportunityScore": 51,
+      "expectedNetProfit": 3600,
+      "locationScore": 35,
+      "priceTrustScore": 18
+    },
+    {
+      "offer": {
+        "title": "iPhone 16 Pro 256Gb Desert Titanium",
+        "price": "18 000 Kč",
+        "location": "Nymburk289 24",
+        "url": "https://mobil.bazos.cz/inzerat/216209579/iphone-16-pro-256gb-desert-titanium.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "KOUPÍM iPhone 16 pro max",
+        "price": "21 000 Kč",
+        "location": "Břeclav690 02",
+        "url": "https://mobil.bazos.cz/inzerat/216007072/koupim-iphone-16-pro-max.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 3000,
+      "similarityScore": 100,
+      "realOpportunityScore": 46,
+      "expectedNetProfit": 2600,
+      "locationScore": 35,
+      "priceTrustScore": 18
+    },
+    {
+      "offer": {
+        "title": "Apple iPhone 17 512gb šalvějově zelená",
+        "price": "22 500 Kč",
+        "location": "Děčín405 02",
+        "url": "https://mobil.bazos.cz/inzerat/215660223/apple-iphone-17-512gb-salvejove-zelena.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "Koupím iPhone 17-17 pro max",
+        "price": "25 000 Kč",
+        "location": "Louny440 01",
+        "url": "https://mobil.bazos.cz/inzerat/216174759/koupim-iphone-17-17-pro-max.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 2500,
+      "similarityScore": 100,
+      "realOpportunityScore": 41,
+      "expectedNetProfit": 2100,
+      "locationScore": 35,
+      "priceTrustScore": 5
+    },
+    {
+      "offer": {
+        "title": "ZÁNOVNÍ APPLE IPHONE 16 PRO MAX 256GB ZLATÝ,100% BATERIE",
+        "price": "19 999 Kč",
+        "location": "Praha 8180 00",
+        "url": "https://mobil.bazos.cz/inzerat/216049600/zanovni-apple-iphone-16-pro-max-256gb-zlaty100-baterie.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "Iphone 16 pro 256gb Black Titan Koupím",
+        "price": "22 000 Kč",
+        "location": "Třebíč675 73",
+        "url": "https://mobil.bazos.cz/inzerat/213792380/iphone-16-pro-256gb-black-titan-koupim.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 2001,
+      "similarityScore": 100,
+      "realOpportunityScore": 39,
+      "expectedNetProfit": 1601,
+      "locationScore": 35,
+      "priceTrustScore": 5
+    },
+    {
+      "offer": {
+        "title": "iPhone 17 512 GB 🍏 jako nový | záruka",
+        "price": "22 999 Kč",
+        "location": "Praha 10108 00",
+        "url": "https://mobil.bazos.cz/inzerat/215975489/iphone-17-512-gb-jako-novy-zaruka.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "Koupím iPhone 17-17 pro max",
+        "price": "25 000 Kč",
+        "location": "Louny440 01",
+        "url": "https://mobil.bazos.cz/inzerat/216174759/koupim-iphone-17-17-pro-max.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 2001,
+      "similarityScore": 100,
+      "realOpportunityScore": 38,
+      "expectedNetProfit": 1601,
+      "locationScore": 35,
+      "priceTrustScore": 5
+    },
+    {
+      "offer": {
+        "title": "ZÁNOVNÍ APPLE IPHONE 16 PRO MAX 256GB ZLATÝ,100% BATERIE",
+        "price": "19 999 Kč",
+        "location": "Praha 8180 00",
+        "url": "https://mobil.bazos.cz/inzerat/216049600/zanovni-apple-iphone-16-pro-max-256gb-zlaty100-baterie.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "KOUPÍM iPhone 16 pro max",
+        "price": "21 000 Kč",
+        "location": "Břeclav690 02",
+        "url": "https://mobil.bazos.cz/inzerat/216007072/koupim-iphone-16-pro-max.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 1001,
+      "similarityScore": 100,
+      "realOpportunityScore": 33,
+      "expectedNetProfit": 601,
+      "locationScore": 35,
+      "priceTrustScore": 5
+    },
+    {
+      "offer": {
+        "title": "Apple iPhone 17 Pro 256GB - stříbrný",
+        "price": "27 990 Kč",
+        "location": "Ostrava725 25",
+        "url": "https://mobil.bazos.cz/inzerat/215433411/apple-iphone-17-pro-256gb-stribrny.php",
+        "brand": "Apple"
+      },
+      "demand": {
+        "title": "Iphone 17pro kosmický oranž",
+        "price": "28 000 Kč",
+        "location": "Zlín760 01",
+        "url": "https://mobil.bazos.cz/inzerat/213592814/iphone-17pro-kosmicky-oranz.php",
+        "brand": "Apple"
+      },
+      "arbitrageScore": 10,
+      "similarityScore": 100,
+      "realOpportunityScore": 29,
+      "expectedNetProfit": 0,
+      "locationScore": 35,
+      "priceTrustScore": 5
+    }
+  ]
+}
