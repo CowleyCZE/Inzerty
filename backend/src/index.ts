@@ -9,12 +9,28 @@ import { randomUUID } from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
 import { initDb, saveAd, getAllAds, updateAdModelAi, updateAdEmbedding, getAllAdsByType, saveMatch, getRecentScrapedUrls, getScrapeCheckpoint, updateScrapeCheckpoint, usingPostgres, isPgVectorAvailable, getPgVectorSimilarities, saveMatchMeta, getResolvedMatchKeys, getDailyMetaStats, clearDatabase, getPreviouslySeenMatchKeys, markMatchesAsSeen, bulkUpdateMatches, getFollowUps, saveConversation, getConversationHistory, getLastConversation, getConversationStats, initDealState, updateDealState, getDealState, getAllDealStates, markDealContacted, markDealStalled, incrementFollowupCount, scheduleFollowup, getPendingFollowups, markFollowupSent, getDealPipeline, saveFraudFlag, getFraudFlags, resolveFraudFlag, addToWatchlist, getWatchlist, isSellerOnWatchlist, removeFromWatchlist, saveNegotiation, updateNegotiation, getNegotiationHistoryLegacy, saveDealAnalytics, getAnalytics, getAnalyticsByPeriod, saveFraudAnalysis, getFraudAnalysisHistory, getFraudAnalysisStats, saveEmailSettings, getEmailSettings, saveEmailTemplate, getEmailTemplate, getAllEmailTemplates, logEmailNotification, saveCalendarEvent, getCalendarEvent, getUpcomingCalendarEvents, updateCalendarEventStatus, generateICal, saveFraudThresholds, getFraudThresholds, getRiskLevel, saveMeetingFeedback, getMeetingFeedback, getFeedbackStats, getNegotiationHistory, saveNegotiationDB, saveNegotiationMessage, getNegotiationStats, saveMLModel, getMLModel, saveNegotiationPattern, getNegotiationPatterns, updatePatternUsage } from './database.js';
 import type { DealState, FraudFlag } from './database.js';
+import { wsService } from './websocket.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = 3001;
+
+// Handle uncaught errors early
+process.on('uncaughtException', (err) => {
+    console.error('Critical Uncaught Exception:', err);
+    if (typeof pushRuntimeLog === 'function') {
+        pushRuntimeLog(`Kritická chyba: ${err.message}`, 'error');
+    }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    if (typeof pushRuntimeLog === 'function') {
+        pushRuntimeLog(`Nevyřízený slib: ${reason}`, 'error');
+    }
+});
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const isLocalOllama = OLLAMA_BASE_URL.includes('localhost') || OLLAMA_BASE_URL.includes('127.0.0.1');
@@ -152,7 +168,6 @@ app.post('/ollama/toggle', async (req, res) => {
             
             // Zkusíme spustit Ollama v backgroundu bez čekání
             setImmediate(() => {
-                const { spawn } = require('child_process');
                 const child = spawn('ollama', ['serve'], {
                     detached: true,
                     stdio: 'ignore',
@@ -591,6 +606,7 @@ Formát odpovědi JSON:
             text: rawText,
             reasoning: 'Generated as plain text',
         };
+        return result;
     } catch (error) {
         console.error('AI message generation failed:', error);
         pushRuntimeLog(`AI generování zprávy selhalo: ${error instanceof Error ? error.message : 'neznámá chyba'}`, 'error');
@@ -4770,8 +4786,6 @@ app.get('/matches/stats', async (req, res) => {
 // WebSocket Real-time Notifications
 // ========================================
 
-import { wsService } from './websocket.js';
-
 // Initialize WebSocket server on port 3002
 const WS_PORT = process.env.WS_PORT ? parseInt(process.env.WS_PORT) : 3002;
 wsService.initialize(WS_PORT);
@@ -4813,21 +4827,50 @@ app.post('/ws/test', (req, res) => {
   });
 });
 
-app.listen(port, () => {
-    pushRuntimeLog(`Backend server běží na adrese http://localhost:${port}`, 'success');
-    pushRuntimeLog(`WebSocket server běží na adrese ws://localhost:${WS_PORT}`, 'success');
-});
+const startServer = () => {
+    try {
+        const server = app.listen(port, () => {
+            pushRuntimeLog(`Backend server běží na adrese http://localhost:${port}`, 'success');
+            pushRuntimeLog(`WebSocket server běží na adrese ws://localhost:${WS_PORT}`, 'success');
+        });
 
-// Keep process alive
-process.stdin.resume();
+        server.on('error', (err: any) => {
+            if (err.code === 'EADDRINUSE') {
+                console.error(`Port ${port} je již používán jinou aplikací.`);
+                pushRuntimeLog(`Port ${port} je obsazen!`, 'error');
+                process.exit(1);
+            } else {
+                console.error('Chyba serveru:', err);
+                pushRuntimeLog(`Chyba serveru: ${err.message}`, 'error');
+            }
+        });
 
-// Handle uncaught errors
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
-    pushRuntimeLog(`Uncaught Exception: ${err.message}`, 'error');
-});
+        // Graceful shutdown
+        const shutdown = () => {
+            console.log('Zastavuji server...');
+            server.close(() => {
+                console.log('Server zastaven.');
+                process.exit(0);
+            });
+        };
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    pushRuntimeLog(`Unhandled Rejection: ${reason}`, 'error');
-});
+        process.on('SIGINT', shutdown);
+        process.on('SIGTERM', shutdown);
+
+    } catch (error) {
+        console.error('Nepodařilo se spustit server:', error);
+        process.exit(1);
+    }
+};
+
+startServer();
+
+// Heartbeat log to monitor stability
+setInterval(() => {
+    if (process.env.NODE_ENV !== 'test') {
+        pushRuntimeLog('Backend heartbeat - server běží v pořádku', 'system');
+    }
+}, 5 * 60 * 1000); // Každých 5 minut
+
+// Keep process alive if needed (though Express should keep it alive)
+// process.stdin.resume();
