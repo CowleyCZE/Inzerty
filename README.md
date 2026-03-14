@@ -6,6 +6,17 @@ Webová aplikace pro **scrapování, ukládání a porovnávání inzerátů** m
 
 ## 📋 Funkce aplikace
 
+### ✅ Akční fronta (Kanban) + metadata
+- **Status pipeline**: `Nové` → `Prověřit` → `Kontaktováno` → `Vyjednávání` → `Uzavřeno`
+- **Priority**: `Nízká`, `Střední`, `Vysoká`, `Kritická`
+- **Poznámky** ke každému zápasu
+- **Follow-up reminder** s nastavením data a stavu
+- **Due diligence checklist** (IMEI, baterie, displej, příslušenství, záruka)
+- **One-click šablony zpráv** pro prodávající i kupující
+- **Export do CSV**
+- **Denní report** stavu (nové/kontaktováno/uzavřeno)
+- **Alerty** na TOP příležitosti (Telegram, Email, Discord)
+
 ### ✅ Inkrementální scraping
 - Scraper automaticky ukládá checkpointy (`brand + ad_type`)
 - Při dalším běhu stahuje jen nové inzeráty
@@ -98,6 +109,41 @@ npm run dev
 Po spuštění obou komponent:
 - Backend API: `http://localhost:3001`
 - Frontend UI: `http://localhost:5173`
+
+---
+
+## ⏹️ Zastavení aplikace
+
+### Rychlé zastavení všech služeb
+
+```bash
+# Pomocí shell skriptu (z rootu projektu)
+./stop.sh
+
+# Nebo pomocí aliasu (po přidání do .bashrc)
+inzerty-stop
+```
+
+Skript automaticky zastaví:
+- ✅ Frontend (Vite dev server, port 5173)
+- ✅ Backend (Node.js server, port 3001)
+- ✅ Ollama (AI server, port 11434)
+
+### Ruční zastavení
+
+```bash
+# Zastavení frontendu (Ctrl+C v terminálu kde běží)
+# nebo nalezení a zabití procesu
+lsof -ti:5173 | xargs kill -9
+
+# Zastavení backendu
+lsof -ti:3001 | xargs kill -9
+
+# Zastavení Ollama
+ollama serve # (Ctrl+C v terminálu)
+# nebo
+lsof -ti:11434 | xargs kill -9
+```
 
 ---
 

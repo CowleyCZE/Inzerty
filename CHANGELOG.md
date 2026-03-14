@@ -1,0 +1,544 @@
+# Changelog
+
+Všechny podstatné změny v tomto projektu budou dokumentovány v tomto souboru.
+
+Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.0.0/)
+a projekt dodržuje [Semantic Versioning](https://semver.org/lang/cs/).
+
+## [Nevydané]
+
+### Přidáno
+- **Partially Implemented Features - Dokončení** ✅
+  - **Email Notifications** - Kompletní implementace
+    - UI pro nastavení SMTP (host, port, user, pass, SSL)
+    - UI pro správu email šablon
+    - Endpointy: GET/POST /email/settings, GET/POST /email/templates, POST /email/send
+    - Logování odeslaných emailů
+    - Fallback pokud není email nakonfigurován
+  - **Database Storage** - Perzistentní ukládání
+    - Nové tabulky: fraud_analysis_history, email_settings, email_templates, email_notifications_log, calendar_events
+    - Persistent storage pro fraud analýzy (místo in-memory)
+    - Funkce: saveFraudAnalysis, getFraudAnalysisHistory, getFraudAnalysisStats
+    - Všechny analýzy se nyní ukládají do DB
+  - **Calendar Integration** - Export a timezone handling
+    - Ukládání eventů do DB (calendar_events tabulka)
+    - iCal export (.ics soubory)
+    - Timezone handling (Europe/Prague default)
+    - Endpointy: POST /calendar/event, GET /calendar/event/:matchKey, GET /calendar/export/:matchKey
+    - Funkce: saveCalendarEvent, getCalendarEvent, generateICal
+  - **Nové UI komponenty**
+    - `EmailSettingsPanel.tsx` - Nastavení email notifikací
+    - Nový tab "📧 Email" v Automation Controls
+- **Deal State Tracking** ✅
+  - **Deal State Tracker**
+    - UI pro sledování stavu každého obchodu
+    - 8 stavů: new, contacted, negotiating, agreed, meeting_scheduled, completed, cancelled, stalled
+    - Progress bar vizualizace stavu
+    - Rychlé přepínání stavů
+    - Statistika (kontakty, poslední kontakt, auto follow-up)
+  - **Pipeline Board**
+    - Kanban-style board pro všechny obchody
+    - 8 sloupců podle stavu
+    - Drag & drop pro změnu stavu
+    - Stats overview pro každý stav
+    - Čas od posledního kontaktu
+  - **Auto State Transitions**
+    - Automatické plánování follow-up při stavu 'contacted'
+    - Auto-save analytics při stavu 'completed'
+    - Runtime logování všech změn stavu
+  - **Nové API endpointy**
+    - `GET /deals/pipeline-board` - Pipeline stats + deals
+    - `GET /deals/:matchKey/state` - Detail stavu obchodu
+    - `POST /deals/:matchKey/state` - Změna stavu obchodu
+  - **Nové komponenty**
+    - `DealStateTracker.tsx`
+    - `DealPipelineBoard.tsx`
+- **Enhanced Fraud Detection** ✅
+  - **Fraud Analyzer**
+    - AI analýza obchodů na podvody a rizika
+    - 15+ red flags detekce (nízká cena, tlak na rychlost, atd.)
+    - Risk scoring 0-100 s úrovněmi (low/medium/high/critical)
+    - AI doporučení pro každý obchod
+    - Expandable detaily s důkazy
+  - **Fraud Report**
+    - Stats overview (total, low, medium, high, critical, watchlist)
+    - Risk percentage vizualizace
+    - Top fraud types žebříček
+    - Bezpečnostní tipy
+  - **Auto-Watchlist Integration**
+    - Automatické přidání při critical risk (≥80)
+    - 90denní expirace
+    - Runtime log warningy
+  - **Nové API endpointy**
+    - `POST /fraud/analyze-full` - Kompletní AI analýza obchodu
+    - `GET /fraud/report` - Fraud report se statistikami
+    - `GET /fraud/history/:matchKey` - Historie analýz pro match
+  - **Nové komponenty**
+    - `FraudAnalyzer.tsx`
+    - `FraudReport.tsx`
+- **Meeting Scheduler** ✅
+  - **AI Meeting Suggestions**
+    - AI generování návrhů míst a časů
+    - Bezpečnostní rating míst (0-100)
+    - Typy míst: kavárna, nákupní centrum, nádraží, veřejné
+    - Časové sloty: dopoledne/odpoledne/večer
+    - Víkendové vs pracovní dny
+    - AI reasoning pro každý návrh
+  - **Meeting Reminders**
+    - Přehled všech naplánovaných schůzek
+    - Filtrace (všechny/nadcházející/dokončené)
+    - Čas do schůzky (za X hodin/dnů)
+    - Auto-reminder 2 hodiny před schůzkou
+    - Manuální odeslání reminderu
+    - Zrušení nebo dokončení schůzky
+  - **Calendar Integration**
+    - Ukládání naplánovaných schůzek
+    - Status tracking (scheduled/confirmed/completed/cancelled)
+    - Auto-check každých 5 minut
+  - **Nové API endpointy**
+    - `POST /meeting/suggest` - AI návrhy míst a časů
+    - `POST /meeting/schedule` - Naplánování schůzky
+    - `GET /meetings/list` - Seznam všech schůzek
+    - `POST /meeting/send-reminder/:matchKey` - Odeslání reminderu
+    - `POST /meeting/cancel/:matchKey` - Zrušení schůzky
+    - `POST /meeting/complete/:matchKey` - Dokončení schůzky
+  - **Nové komponenty**
+    - `MeetingScheduler.tsx`
+    - `MeetingReminders.tsx`
+- **AI Priority Scoring** ✅
+  - **Priority Dashboard**
+    - Stats overview (total, prioritize, normal, skip, avg score)
+    - Filtrace podle doporučení (all/prioritize/normal/skip)
+    - Tabulka všech obchodů seřazená podle skóre
+    - Barevné rozlišení priorit (emerald/blue/red)
+  - **AI Scoring System**
+    - 5-komponentní skórování:
+      - Profitabilita (30%)
+      - Důvěryhodnost (25%)
+      - Urgence (20%)
+      - Tržní trend (15%)
+      - Kapacita (10%)
+    - AI generování recommendation (prioritize/normal/skip)
+    - AI reasoning s vysvětlením
+    - Caching pro AI responses
+  - **Match Priority UI**
+    - Detail priority pro jednotlivý match
+    - Rozklad skóre s progress bary
+    - AI reasoning box
+    - Možnost přepočítat prioritu
+  - **Nové API endpointy**
+    - `GET /priority/dashboard` - Priority overview se stats
+    - `GET /priority/:matchKey` - Detail priority matche
+    - `POST /priority/calculate` - Výpočet priority
+    - `POST /priority/recalculate-all` - Hromadný přepočet
+  - **Nové komponenty**
+    - `PriorityDashboard.tsx`
+    - `MatchPriority.tsx`
+- **Auto Negotiation - Část 2** ✅
+  - **Message Analyzer**
+    - AI analýza zpráv od prodejců/kupujících
+    - Detekce counter-offer ve zprávě
+    - Extrakce ceny z textu
+    - Analýza sentimentu (pozitivní/neutrální/negativní)
+    - Detekce urgency (nízká/střední/vysoká)
+    - Caching pro AI responses
+  - **Decision Engine**
+    - Accept/Reject/Counter logika
+    - Auto-přijmout pokud counter ≤ threshold
+    - Auto-odmítnout pokud counter > demand price
+    - Auto-counter-offer s optimalizací ceny
+    - Manuální schválení pro finální nabídky
+  - **Auto-Send Messages**
+    - Automatické odesílání counter-offers
+    - Ukládání do negotiation logs
+    - Integrace s negotiation_history DB
+  - **Negotiation History UI**
+    - Timeline všech zpráv
+    - Barevné rozlišení sender (my vs prodejce)
+    - AI analysis results inline
+    - Auto-negotiate tlačítko
+    - Negotiation logs s akcemi (accept/reject/counter)
+  - **Nové API endpointy**
+    - `POST /negotiation/analyze-message` - AI analýza zprávy
+    - `POST /negotiation/auto-counter` - Auto-counteroffer
+    - `GET /negotiation/logs` - Historie auto-negotiations
+    - `GET /conversations/history` - Historie konverzací
+  - **Nové komponenty**
+    - `NegotiationHistory.tsx`
+- **Auto Negotiation - Část 1** 🔄
+  - **UI AutoNegotiationSettings**
+    - Toggle pro povolení auto negotiation
+    - Stats overview (total, successful, avg savings, avg rounds)
+    - Nastavení min profit
+    - Nastavení max discount %
+    - Nastavení auto-accept threshold
+    - Nastavení max kol vyjednávání
+    - Toggle pro manuální schválení finální nabídky
+  - **Backend endpointy**
+    - `GET /negotiation/settings` - Načtení nastavení
+    - `POST /negotiation/settings` - Uložení nastavení
+    - `GET /negotiation/stats` - Statistiky vyjednávání
+  - **Integrace do Automation Controls**
+    - Nový tab "💰 Vyjednávání"
+- **AI autonomní komunikace - Fáze 4** ✅
+  - **UI Automation Controls** - Hlavní stránka pro automatizaci
+    - Toggle pro auto follow-up
+    - Toggle pro auto fraud detection
+    - Toggle pro auto negotiation
+    - Pokročilá nastavení (min profit, fraud threshold, watchlist expirace)
+  - **Fraud Dashboard** - UI pro fraud detection
+    - Stats overview (total, unresolved, critical, high)
+    - Filtrace (všechny, nevyřešené, critical)
+    - Barevné rozlišení risk levels
+    - Detail flags s důkazy
+    - Resolve akce
+  - **Analytics Charts** - UI pro analytics
+    - Key metrics (6 karet)
+    - Revenue bar chart
+    - Success rate donut chart
+    - Time to close chart
+    - Profit distribution chart
+  - **Negotiation Interface** - UI pro vyjednávání
+    - Price overview (nabídka, poptávka, zisk)
+    - Profit analysis bar
+    - AI optimal offer calculator
+    - Counter-offer input s vyhodnocením
+    - Negotiation history view
+  - **Performance Optimalizations**
+    - AI Response Cache (15 minut TTL, max 1000 entries)
+    - Cache management endpointy (`/cache/clear`, `/cache/stats`)
+    - Auto-cleanup expired entries
+    - Cache hit logging
+  - **Nové komponenty**
+    - `FraudDashboard.tsx`
+    - `AnalyticsCharts.tsx`
+    - `NegotiationInterface.tsx`
+    - `AutomationControls.tsx`
+  - **Nové API endpointy**
+    - `POST /cache/clear` - Vymazání cache
+    - `GET /cache/stats` - Statistiky cache
+- **AI autonomní komunikace - Fáze 3** ✅
+  - **Fraud Detection System** - AI detekce podvodů a rizik
+    - Analýza 12+ rizikových faktorů (nízká cena, tlak na rychlost, atd.)
+    - AI generování fraud flags s důkazy
+    - Auto-save high-risk inzerátů do databáze
+    - Barevné rozlišení: low/medium/high/critical
+  - **Seller Watchlist** - Watchlist pro podezřelé prodejce
+    - Auto-add při critical risk score (≥80)
+    - Sledování incident count per seller
+    - Expirace po 90 dnech
+    - Kontrola při každém scrapování
+  - **Auto Negotiation Engine** - AI vyjednávání cen
+    - Optimal offer calculation s AI reasoning
+    - Auto-counteroffer systém (accept/reject/counter)
+    - Context-aware negotiation (market avg, days on market, urgency)
+    - Min profit protection
+  - **Deal Analytics** - Pokročilé statistiky
+    - Total deals, closed deals tracking
+    - Average profit per deal
+    - Average time to close (hodiny)
+    - Total revenue tracking
+    - Success rate calculation
+    - Period-based analytics (30 dní default)
+  - **Nové databázové tabulky**
+    - `fraud_flags` - Ukládání rizikových inzerátů
+    - `seller_watchlist` - Watchlist prodejců
+    - `negotiation_history` - Historie vyjednávání
+    - `deal_analytics` - Analytics data
+  - **Nové API endpointy**
+    - `POST /fraud/analyze/:matchKey` - AI fraud analýza
+    - `GET /fraud/flags` - Získání fraud flags
+    - `POST /fraud/resolve/:fraudId` - Resolve fraud flag
+    - `GET /watchlist` - Získání watchlistu
+    - `POST /watchlist/add` - Přidání na watchlist
+    - `POST /negotiation/calculate` - Výpočet optimální nabídky
+    - `POST /negotiation/counter` - Generování counter-offer
+    - `POST /negotiation/save` - Uložení negotiation
+    - `GET /negotiation/history/:matchKey` - Historie vyjednávání
+    - `GET /analytics` - Celkové statistiky
+    - `GET /analytics/period/:days` - Analytics za období
+    - `POST /analytics/save/:matchKey` - Uložení analytics
+- **AI autonomní komunikace - Fáze 2** ✅
+  - **Deal State Machine** - Sledování stavu obchodů
+    - 8 stavů: `new`, `contacted`, `negotiating`, `agreed`, `meeting_scheduled`, `completed`, `cancelled`, `stalled`
+    - Automatické přechody mezi stavy
+    - Synchronizace s `match_meta` status
+  - **Auto Follow-up systém**
+    - Automatické plánování follow-upů po 24 hodinách
+    - AI generování follow-up zpráv s kontextem historie
+    - Scheduler běží každou minutu a zpracovává pending follow-upy
+    - Ukládání počtu follow-upů a času posledního kontaktu
+  - **Stalled Deal Detector**
+    - Automatická detekce neaktivních obchodů po 48 hodinách
+    - Auto-označení jako `stalled` stav
+    - Kontrola každých 6 hodin
+  - **Conversation Dashboard**
+    - Pipeline overview s 8 stavy
+    - Filtrace podle stavu
+    - Statistiky (počet obchodů, průměrný čas od kontaktu)
+    - Interaktivní tabulka všech konverzací
+    - Indikátor auto follow-up statusu
+  - **Nové databázové tabulky**
+    - `deal_states` - Sledování stavů obchodů
+    - `followup_schedule` - Plánování follow-upů
+  - **Nové databázové funkce**
+    - `initDealState()`, `updateDealState()`, `getDealState()`
+    - `getAllDealStates()`, `markDealContacted()`, `markDealStalled()`
+    - `incrementFollowupCount()`, `scheduleFollowup()`
+    - `getPendingFollowups()`, `markFollowupSent()`, `getDealPipeline()`
+  - **Nové API endpointy**
+    - `POST /deals/:matchKey/state` - Aktualizace stavu
+    - `GET /deals/:matchKey/state` - Získání stavu
+    - `GET /deals/pipeline` - Pipeline statistiky
+    - `GET /followups/pending` - Pending follow-upy
+- **AI autonomní komunikace - Fáze 1**
+  - **AI message generator** - Automatické generování zpráv pomocí Ollama AI
+    - Podpora pro všechny kanály: Bazoš, SMS, E-mail
+    - Kontextově uvědomělé zprávy na základě obchodu
+    - Historie komunikace pro lepší kontext
+    - Fallback na klasické šablony při selhání AI
+    - Přizpůsobení stylu komunikace (formální/přátelský/přímý)
+  - **Databáze konverzací**
+    - Nová tabulka `conversations` pro ukládání historie
+    - Ukládání odesílatele, kanálu, času, AI generování flag
+    - JSON snapshot kontextu pro audit
+    - Indexy pro rychlé vyhledávání podle match_key a data
+  - **Backend API endpointy**
+    - `POST /ai/generate-message` - Generování AI zprávy s kontextem
+    - `GET /conversations/:matchKey` - Získání historie konverzace
+    - `POST /conversations/:matchKey` - Uložení zprávy do historie
+    - `GET /conversations/:matchKey/stats` - Statistiky konverzace
+  - **Nové databázové funkce**
+    - `saveConversation()` - Uložení zprávy
+    - `getConversationHistory()` - Získání celé historie
+    - `getLastConversation()` - Poslední zpráva
+    - `getConversationStats()` - Statistiky (počet zpráv, AI generované, atd.)
+- **Rozšířené šablony zpráv s výběrem kanálu**
+  - 6 variant šablon: Bazoš zpráva, SMS, E-mail (pro prodávající i kupující)
+  - SMS šablony s automatickou optimalizací na 160 znaků
+  - E-mail šablony s předmětem a kontaktními údaji
+  - Různý text pro prodávající (zájem o koupi) a kupující (nabídka odkupu)
+  - Ikony pro lepší UX (📩 Bazoš, 📱 SMS, 📧 E-mail)
+- **Backend API pro vlastní šablony**
+  - `GET /templates/messages` - získání uložených šablon
+  - `POST /templates/messages` - uložení vlastní šablony
+- **Detailní breakdown skóre reálné příležitosti**
+  - Tooltip s rozkladem všech 6 komponent skóre
+  - Zobrazení vah jednotlivých složek (28% zisk, 23% podobnost, 16% marže, 13% stáří, 10% lokalita, 10% důvěryhodnost)
+  - Interaktivní nápověda s otazníkem
+- **Vylepšené alerty s pokročilým formátováním**
+  - **Telegram**: Markdown formátování, automatické dělení dlouhých zpráv (>4000 znaků)
+  - **Email**: HTML email s responsivním designem, barevným zvýrazněním zisku a score
+  - **Discord**: Rich embeds s poli pro nabídku/poptávku, barevné kódování podle výše zisku (zelená ≥2000 Kč, oranžová ≥1000 Kč, červená <1000 Kč)
+  - Vylepšený text alertů s detaily lokalit a přímými odkazy
+- **Konfigurace alertů v UI**
+  - Rozbalitelný panel s nastavením všech webhooků
+  - Filtry podle minimálního zisku a score
+  - Přepínač pro povolení automatických alertů
+  - Tlačítko pro odeslání testovacího alertu
+  - Ukládání konfigurace na backend (`/alerts/config`)
+- **Nové backend endpointy**
+  - `GET /alerts/config` - získání konfigurace alertů
+  - `POST /alerts/config` - uložení konfigurace
+  - `POST /alerts/test` - odeslání testovacího alertu
+- **Pokročilá správa blacklist/whitelist pravidel**
+  - **Blacklist management**:
+    - Přidávání položek jednotlivě s Enterem nebo tlačítkem
+    - Odstraňování položek kliknutím na ×
+    - Vizualizace jako tagy s emoji (🚫)
+    - Nápověda s příklady použití
+    - Hromadný import/export přes čárkami oddělený text
+  - **Whitelist management**:
+    - Přidávání modelů jednotlivě s Enterem nebo tlačítkem
+    - Odstraňování položek kliknutím na ×
+    - Vizualizace jako tagy s emoji (✅)
+    - Nápověda s příklady použití
+    - Prázdný whitelist = všechny modely povoleny
+  - **Cenové filtry**:
+    - Minimální a maximální cena
+    - Minimální velikost úložiště (GB)
+  - **Validace**:
+    - Kontrola duplicit při přidávání
+    - Case-insensitive porovnávání
+    - Status zprávy při chybách
+- **Deduplikace mezi běhy a hromadné akce**
+  - **Automatické ukládání zobrazených zápasů**:
+    - Po 3 vteřinách zobrazení se zápas automaticky uloží jako "seen"
+    - Perzistentní ukládání v `match_meta` a `matches` tabulkách
+  - **Filtr "skrýt dříve zobrazené"**:
+    - Checkbox pro skrytí všech dříve uložených zápasů
+    - Počítadlo dříve zobrazených zápasů
+  - **Hromadné akce (bulk actions)**:
+    - Výběr jednotlivých zápasů pomocí checkboxů
+    - "Označit všechny na stránce" tlačítko
+    - Panel hromadných akcí pro vybrané zápasy
+    - Akce: "Označit jako vyřešené", "Označit jako kontaktováno"
+  - **Nové backend endpointy**:
+    - `GET /matches/seen` - získání seznamu dříve zobrazených zápasů
+    - `POST /matches/mark-seen` - označení zápasů jako zobrazené
+    - `POST /matches/bulk-update` - hromadná aktualizace vybraných zápasů
+    - `GET /matches/stats` - statistiky (resolved/seen/new counts)
+  - **Nové databázové funkce**:
+    - `getPreviouslySeenMatchKeys()` - získá všechny dříve zobrazené zápasy
+    - `markMatchesAsSeen()` - označí zápasy jako zobrazené
+    - `bulkUpdateMatches()` - hromadná aktualizace více zápasů najednou
+- **Export CSV/Google Sheets**
+  - **Rozšířený CSV export**:
+    - 19 sloupců: matchKey, offerTitle, demandTitle, profit, opportunity, offerPrice, demandPrice, offerLocation, demandLocation, offerUrl, demandUrl, status, priority, note, lastActionAt, followUpAt, resolved, brand, exportedAt
+    - Správné formátování čísel (čárka jako desetinná tečka)
+    - Boolean hodnoty konvertovány na 'ANO'/'NE'
+    - Escape uvozovek v textech
+    - Počítadlo exportovaných řádků
+    - Status zpráva po úspěšném exportu
+  - **Google Sheets API integrace**:
+    - Endpoint `/export/sheets` - přímý export přes Google Sheets API v4
+    - Endpoint `/export/sheets/config` - uložení konfigurace (spreadsheetId, apiKey, sheetName)
+    - Endpoint `/export/sheets/webhook` - alternativa přes Google Apps Script
+    - Česká lokalizace sloupců (Datum exportu, Nabídka/Poptávka, Zisk, atd.)
+    - Podpora pro OAuth token / API key autentizaci
+  - **Frontend UI**:
+    - Tlačítko "📊 Export CSV" s downloadem souboru
+    - Rozbalitelný panel "📈 Google Sheets"
+    - Dvě možnosti exportu: Google API nebo Apps Script webhook
+    - Vstupní pole pro Spreadsheet ID, API Key, název listu
+    - Textarea pro Google Apps Script Web App URL
+    - Nápověda s postupem nastavení
+    - Status zprávy s počtem exportovaných řádků
+  - **Přípravená data pro export**:
+    - Všechny relevantní informace o zápasu (nabídka, poptávka, zisk, score)
+    - Lokality a URL odkazy
+    - Stav, priorita, poznámky, follow-up datum
+    - Indikátor "vyřešeno" (ANO/NE)
+- **Kalendář/Reminder pro follow-up**
+  - **Backend endpointy**:
+    - `GET /followups` - seznam follow-upů s filtry (from, to, state, overdue)
+    - `GET /followups/summary` - souhrn: prošlé, dnes, zítra, tento týden
+    - `POST /followups/:matchKey/remind` - odeslání reminderu (Telegram/Email)
+  - **Databázová funkce**:
+    - `getFollowUps(options)` - získání follow-upů s možnostmi filtrování
+    - Podpora pro overdue (prošlé) i nadcházející follow-upy
+    - JOIN s matches a ads tabulkami pro detaily inzerátů
+  - **Frontend komponenta** (`FollowUpCalendar.tsx`):
+    - **Souhrnné karty**: Počty prošlých, dnešních, zítřejších a týdenních follow-upů
+    - **Filtrování**: Všechny / Prošlé / Dnes / Zítra / Tento týden
+    - **Barevné rozlišení**: 
+      - Prošlé (červený background)
+      - Stavy (čeká se, neodpověděl, hotovo)
+      - Priority (nízká/střední/vysoká/kritická)
+    - **Detail follow-upu**:
+      - Název nabídky a poptávky
+      - Výše zisku
+      - Termín a čas
+      - Poznámka
+      - Tlačítka: "Poslat reminder", "Otevřít detail"
+  - **Integrace v App.tsx**:
+    - Nová view "⏰ Kalendář" v navigaci
+    - Načítání alerts configu z localStorage
+    - Předání konfigurace pro reminder notifikace
+  - **Notifikace**:
+    - Browser alert po odeslání reminderu
+    - Podpora pro Telegram a Email notifikace
+    - Rozlišení prošlých vs. nadcházejících follow-upů
+- **Due Diligence Checklist (vylepšené UI)**
+  - **5 kontrolních položek** s ikonami a popisky:
+    - 🆔 IMEI - Ověřeno
+    - 🔋 Baterie - Zkontrolována
+    - 📱 Displej - Bez vad
+    - 🔌 Příslušenství - Kompletní
+    - 📄 Záruka - Doklad
+  - **Vizuální vylepšení**:
+    - Progress bar ukazující postup (X/5 splněno)
+    - Barevné rozlišení splněných/nesplněných položek
+    - Zelené zvýraznění (bg-emerald-900/30) pro zaškrtnuté
+    - Animovaný přechod při změně stavu
+  - **Interaktivní design**:
+    - Velké klikací oblasti (celý box)
+    - Hover efekty na boxech
+    - Custom checkboxy s focus ring
+  - **Statistika**:
+    - Počítadlo splněných položek (např. "3 / 5 splněno")
+    - Dynamická šířka progress baru
+  - **Ukládání**:
+    - JSON formát v `checklist_json` sloupci
+    - Automatické uložení při každé změně
+    - Synchronizace s backendem přes `/match-meta` endpoint
+
+### Změněno
+- Vylepšeny hover stavy u tlačítek šablon zpráv
+- Opportunity score nyní zobrazeno s detailním tooltipem
+- Alerty nyní obsahují detailní informace o lokalitách a přímé odkazy
+- Rozšířeno UI blacklist/whitelist o tagy, validaci a nápovědu
+
+### Opraveno
+- Nic nového
+
+---
+
+## [1.0.0] - 2026-03-11
+
+### Přidáno
+- **Kompletní Kanban workflow pro arbitrážní příležitosti**
+  - Status pipeline: `Nové` → `Prověřit` → `Kontaktováno` → `Vyjednávání` → `Uzavřeno`
+  - Priority: `Nízká`, `Střední`, `Vysoká`, `Kritická`
+  - Poznámky k jednotlivým zápasům
+  - `lastActionAt` timestamp automaticky aktualizován při každé změně
+  - Metadata uložena v backendu (PostgreSQL/SQLite) + lokálně v localStorage
+- **One-click šablony zpráv**
+  - Tlačítka pro kopírování zpráv prodávajícímu i kupujícímu
+  - Vlastní podpis konfigurovatelný v UI
+- **Skóre reálné příležitosti**
+  - Výpočet `realOpportunityScore` s váženými komponentami
+- **Alerty na TOP shody**
+  - Endpoint `/alerts/notify` pro Telegram, Email, Discord
+- **Dedup & „už řešeno" paměť**
+  - `match_meta` tabulka s `resolved` flag
+  - Filtr „Skrýt vyřešené" v UI
+- **Export do CSV + denní report**
+  - `POST /export/csv` - export výsledků
+  - `GET /reports/daily` - denní statistiky
+- **Kalendář/Reminder pro follow-up**
+  - `followUpAt` datetime pole
+  - `followUpState`: `none`, `waiting`, `no_response`, `done`
+- **Due diligence checklist**
+  - 5 položek: IMEI, baterie, displej, příslušenství, záruka
+
+### Změněno
+- Nic nového
+
+### Opraveno
+- Nic nového
+
+---
+
+## [0.9.0] - 2026-02-25
+
+### Přidáno
+- Implementován inkrementální scraping s checkpointy
+- Rotace User-Agent headers pro anti-detection
+- Retry logika s exponenciálním backoff a jitter
+- Podpora pro proxy rotaci přes `SCRAPER_PROXY_URLS`
+- AI porovnávání pomocí Ollama (llama3.2:1b)
+- Keyword-based porovnávání jako fallback
+- Arbitrážní skóre výpočet
+- Hybridní databázová podpora (SQLite/PostgreSQL)
+
+### Změněno
+- Nic nového
+
+### Opraveno
+- Nic nového
+
+---
+
+## [0.1.0] - 2026-02-20
+
+### Přidáno
+- Základní scraping funkcionalita pro Bazoš.cz
+- Frontend dashboard pro monitorování
+- Ukládání inzerátů do databáze
+
+### Změněno
+- Nic nového
+
+### Opraveno
+- Nic nového
