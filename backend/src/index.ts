@@ -526,19 +526,20 @@ const generateAIMessage = async (context: MessageContext): Promise<{
 Generuj přirozenou lidskou zprávu pro ${side === 'seller' ? 'prodávajícího' : 'kupujícího'} na českém bazaru.
 
 Kontext obchodu:
-- Nabídka: ${match.offer.title} za ${match.offer.price} (${match.offer.location})
-- Poptávka: ${match.demand.title} za ${match.demand.price} (${match.demand.location})
+- Nabídka (co kupujeme): ${match.offer.title} za ${match.offer.price} (${match.offer.location})
+- Poptávka (co prodáváme): ${match.demand.title} za ${match.demand.price} (${match.demand.location})
 - Potenciální zisk: ${match.arbitrageScore} Kč
 - Podobnost: ${match.similarityScore}%
 
 ${side === 'seller' ? `
 Kontaktujeme PRODÁVAJÍCÍHO (${counterpart.title}):
-- Máme zájemce který hledá: ${otherSide.title}
-- Chceme nabídnout konkrétní telefon ze shody
+- Chceme koupit jeho telefon: ${counterpart.title}
+- Máme již zájemce který hledá: ${otherSide.title}
 ` : `
 Kontaktujeme KUPUJÍCÍHO (${counterpart.title}):
 - Hledá: ${counterpart.title}
-- Máme k dispozici: ${otherSide.title} za ${otherSide.price}
+- Máme k dispozici: ${otherSide.title}
+- Naše cena: ${otherSide.price} (MUSÍ BÝT VYŠŠÍ NEŽ ZA KOLIK JSME TO KOUPILI!)
 `}
 
 ${previousMessages.length > 0 ? `
@@ -549,18 +550,25 @@ ${previousMessages.map(m => `- ${m.sender === 'user' ? 'My' : 'Oni'}: ${m.messag
 Styl komunikace: ${userStyle}
 Kanál: ${channel}
 
-Požadavky na zprávu:
+DŮLEŽITÉ POŽADAVKY:
 1. Zpráva musí znít lidsky, ne jako bot
 2. Nikdy nepoužívat fráze jako "Inzerty Bot", "automatizovaná zpráva", "AI"
 3. Být zdvořilý ale přímý
-4. Obsahovat konkrétní detaily z inzerátu
-5. ${side === 'seller' ? 'Nabídnout konkrétní telefon zájemci' : 'Vyjádřit zájem o konkrétní telefon'}
-6. Nezmiňovat osobní předání pokud to není nutné
-7. Maximálně ${channel === 'sms' ? '50 slov' : channel === 'bazos' ? '100 slov' : '150 slov'}
+4. ${side === 'seller' ? 'Prodat zájem - chci koupit jeho telefon' : 'Nabídnout konkrétní telefon který máme skladem'}
+5. Nezmiňovat osobní předání pokud to není nutné
+6. Maximálně ${channel === 'sms' ? '50 slov' : channel === 'bazos' ? '100 slov' : '150 slov'}
 
 ${channel === 'email' ? 'Vygeneruj také předmět zprávy (max 60 znaků).' : ''}
 
 ${channel === 'sms' ? 'DŮLEŽITÉ: SMS musí mít max 160 znaků včetně mezer!' : ''}
+
+${side === 'seller' ? `
+PŘÍKLAD SPRÁVNÉ ZPRÁVY PRO PRODÁVAJÍCÍHO:
+"Dobrý den, mám zájem o koupi vašeho ${counterpart.title}. Jsem vážný zájemce a mohu přijet osobně. Kdy byste měl čas na předání? Děkuji."
+` : `
+PŘÍKLAD SPRÁVNÉ ZPRÁVY PRO KUPUJÍCÍHO:
+"Dobrý den, viděl jsem Váš inzerát. Mám k dispozici ${otherSide.title} za ${otherSide.price}. Přesně odpovídá Vašemu zájmu. Máte zájem? Děkuji."
+`}
 
 Formát odpovědi JSON:
 {
@@ -623,11 +631,13 @@ const generateFallbackMessage = (context: MessageContext): string => {
     const { match, side, channel } = context;
     const counterpart = side === 'seller' ? match.offer : match.demand;
     const otherSide = side === 'seller' ? match.demand : match.offer;
-    
+
     if (side === 'seller') {
-        return `Dobrý den, mám zájemce který hledá ${otherSide.title}. Mám k dispozici ${otherSide.title} za ${otherSide.price}. Zařízení je plně funkční. Máte zájem? Děkuji.`;
+        // Zpráva pro PRODÁVAJÍCÍHO - chceme koupit jeho telefon
+        return `Dobrý den, mám zájem o koupi vašeho ${counterpart.title}. Jsem vážný zájemce a mohu přijet osobně. Kdy byste měl čas na předání? Děkuji.`;
     } else {
-        return `Dobrý den, viděl jsem Váš inzerát. Mám k dispozici ${otherSide.title} za ${otherSide.price}. Přesně odpovídá Vašemu zájmu. Zařízení je plně funkční. Máte zájem? Děkuji.`;
+        // Zpráva pro KUPUJÍCÍHO - nabízíme mu telefon
+        return `Dobrý den, viděl jsem Váš inzerát. Mám k dispozici ${otherSide.title} za ${otherSide.price}. Přesně odpovídá Vašemu zájmu. Máte zájem? Děkuji.`;
     }
 };
 
