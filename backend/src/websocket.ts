@@ -21,9 +21,10 @@ class WebSocketService {
   private matchSubscribers: Map<string, Set<Client>> = new Map();
 
   initialize(port: number) {
-    this.wss = new WebSocketServer({ port });
+    try {
+      this.wss = new WebSocketServer({ port });
 
-    this.wss.on('connection', (ws: Client, request: IncomingMessage) => {
+      this.wss.on('connection', (ws: Client, request: IncomingMessage) => {
       const url = new URL(request.url || '', `http://localhost:${port}`);
       const userId = url.searchParams.get('userId') || 'anonymous';
       const matchKeys = url.searchParams.get('matchKeys')?.split(',') || [];
@@ -75,7 +76,15 @@ class WebSocketService {
       });
     });
 
-    console.log(`🚀 WebSocket server running on port ${port}`);
+      console.log(`🚀 WebSocket server running on port ${port}`);
+
+      this.wss.on('error', (error) => {
+        console.error('WebSocket Server Error:', error);
+      });
+
+    } catch (error) {
+      console.error(`Failed to initialize WebSocket server on port ${port}:`, error);
+    }
   }
 
   private handleMessage(client: Client, data: any) {
