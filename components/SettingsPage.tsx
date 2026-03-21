@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Config } from '../types';
+import { Config, AdSource } from '../types';
+import { PlatformSelector } from './PlatformSelector';
 
 interface SettingsPageProps {
   config: Config;
@@ -150,8 +151,23 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, onSave, onClearData
     <section className="mt-6 bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-2xl">
       <h2 className="text-2xl font-semibold text-emerald-400 mb-4">Nastavení aplikace</h2>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="space-y-4">
+      <div className="space-y-6">
+        {/* Platform Selector */}
+        <PlatformSelector
+          enabledPlatforms={draft.enabledPlatforms || ['bazos_cz']}
+          onTogglePlatform={(source, enabled) => {
+            setDraft((prev) => {
+              const current = prev.enabledPlatforms || ['bazos_cz'];
+              const updated = enabled
+                ? [...current, source]
+                : current.filter(s => s !== source);
+              return { ...prev, enabledPlatforms: updated };
+            });
+          }}
+        />
+
+        <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
           <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
             <h3 className="font-semibold text-sky-300 mb-2">Nastavení scrapování</h3>
             <label className="inline-flex items-center gap-2 text-sm text-slate-300">
@@ -418,11 +434,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ config, onSave, onClearData
             </button>
             {statusMessage && <p className="text-sm text-slate-300">{statusMessage}</p>}
           </div>
-        </div>
+          </div>
 
-        <div className="bg-slate-900 border border-slate-700 rounded-lg p-4">
-          <h3 className="font-semibold text-emerald-300 mb-2">Vygenerované .env nastavení</h3>
-          <pre className="text-xs text-slate-200 bg-slate-950 border border-slate-700 rounded p-3 overflow-auto">{envSnippet}</pre>
+          {/* Druhý sloupec */}
+          <div className="space-y-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-lg p-4">
+              <h3 className="font-semibold text-emerald-300 mb-2">Vygenerované .env nastavení</h3>
+              <pre className="text-xs text-slate-200 bg-slate-950 border border-slate-700 rounded p-3 overflow-auto">{envSnippet}</pre>
+            </div>
+          </div>
         </div>
       </div>
     </section>

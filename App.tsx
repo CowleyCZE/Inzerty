@@ -209,11 +209,21 @@ const App = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3001/scrape-all', {
+      // Zjistit zda jsou povolené více platforem
+      const enabledPlatforms = config.enabledPlatforms || ['bazos_cz'];
+      const useMultiPlatform = enabledPlatforms.length > 1 || enabledPlatforms[0] !== 'bazos_cz';
+
+      const endpoint = useMultiPlatform ? '/scrape-all-multi' : '/scrape-all';
+      
+      const response = await fetch(`http://localhost:3001${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectors: config.selectors, scrapingOptions: config.scrapingOptions || { stopOnKnownAd: true, maxAdsPerTypePerBrand: 50 } }),
-        signal: AbortSignal.timeout(120000) // 2 minuty timeout
+        body: JSON.stringify({ 
+          selectors: config.selectors, 
+          scrapingOptions: config.scrapingOptions || { stopOnKnownAd: true, maxAdsPerTypePerBrand: 50 },
+          enabledPlatforms: useMultiPlatform ? enabledPlatforms : undefined,
+        }),
+        signal: AbortSignal.timeout(600000) // 10 minut timeout
       });
 
       if (!response.ok) {
@@ -222,16 +232,31 @@ const App = () => {
       }
 
       const result = await response.json();
-      setAds(result.data.ads || []);
-      setScrapeSummary({
-        nabidka: result.data.nabidkaCount,
-        poptavka: result.data.poptavkaCount,
-        savedNabidka: result.data.savedNabidkaCount,
-        savedPoptavka: result.data.savedPoptavkaCount,
-        healthWarning: result.data.healthWarning || '',
-      });
+      
+      if (useMultiPlatform) {
+        // Multi-platform response format
+        setScrapeSummary({
+          nabidka: result.data.totalAds,
+          poptavka: 0,
+          savedNabidka: result.data.totalSaved,
+          savedPoptavka: 0,
+          healthWarning: '',
+        });
+        setProgress(`Multi-Platform scrapování dokončeno: ${result.data.totalAds} inzerátů z ${result.data.successPlatforms?.length || 0} platforem`);
+      } else {
+        // Legacy response format
+        setAds(result.data.ads || []);
+        setScrapeSummary({
+          nabidka: result.data.nabidkaCount,
+          poptavka: result.data.poptavkaCount,
+          savedNabidka: result.data.savedNabidkaCount,
+          savedPoptavka: result.data.savedPoptavkaCount,
+          healthWarning: result.data.healthWarning || '',
+        });
+        setProgress('Scrapování dokončeno. Připraveno k porovnání.');
+      }
+      
       setAppState('scraping-done');
-      setProgress('Scrapování dokončeno. Připraveno k porovnání.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Neznámá chyba';
       if (message.includes('timeout')) {

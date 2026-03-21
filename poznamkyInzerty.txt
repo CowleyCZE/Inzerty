@@ -1,37 +1,53 @@
-Zájem o V ZÁRUCE Apple iPhone 16 Pro Max 256GB - 18 000 Kč
+Zde jspou stránky ze kterých má aplikace scrapovat inzeráty s poptávkou. Pro další značky stačí zaměnit název v url adrese. 
+Další značky jsou:
+"samsung" (Samsung)
+"apple" (Apple)
+"google" (Google)
+"huawei" (Huawei)
+"motorola" (Motorola)
+"nokia" (Nokia)
+"realme" (Realme)
+"ericsson" (Sony)
+"xiaomi" (Xiaomi
+"mobily" (ostatní značky)
 
-Dobrý den,
 
-reaguji na Váš inzerát "V ZÁRUCE Apple iPhone 16 Pro Max 256GB" za cenu 18 000 Kč v lokalitě Karviná735 14.
+Stránka pro značku "Samsung" za použití slova "koupim" 
+"https://mobil.bazos.cz/samsung/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano"
 
-Mám vážný zájem o koupi tohoto zboží. Jsem připraven se domluvit na osobním předání a rychlém jednání.
+Další stránka pro značku "Samsung" za použití slova "koupim" 
+"https://mobil.bazos.cz/samsung/20/?hledat=koupim&hlokalita=&humkreis=25&cenaod=&cenado=&order="
 
-Prosím o odpověď s bližšími detaily a možnostmi předání.
+Stránka pro značku "Apple" za použití slova "koupim" 
+"https://mobil.bazos.cz/apple/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano"
 
-Těším se na Vaši odpověď.
+Další stránka pro značku "Apple" za použití slova "koupim" 
+"https://mobil.bazos.cz/apple/20/?hledat=koupim&hlokalita=&humkreis=25&cenaod=&cenado=&order="
 
-S pozdravem,
-Inzerty Bot
+Stránka pro značku "huawei" za použití slova "koupim" 
+"https://mobil.bazos.cz/huawei/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano"
 
---
-Tel: [Váš telefon]
-Email: [Váš email]
+Stránky pro scrapování inzerátů s nabídkami jsou:
 
-Zájem o KOUPÍM iPhone 16 pro max - 21 000 Kč
+Pro Apple:
+"https://mobil.bazos.cz/apple/"
+Další stránka s inzeráty pro apple je:
+"https://mobil.bazos.cz/apple/20/"
+Další stránka s inzeráty pro apple je:
+"https://mobil.bazos.cz/apple/40/"
+Další stránka s inzeráty pro apple je:
+"https://mobil.bazos.cz/apple/60/"
+atd.
 
-Dobrý den,
+Pro Google:
+"https://mobil.bazos.cz/google/"
+Další stránka s inzeráty pro Google je:
+"https://mobil.bazos.cz/google/20/"
+Další stránka s inzeráty pro Google je:
+"https://mobil.bazos.cz/google/40/"
+Další stránka s inzeráty pro Google je:
+"https://mobil.bazos.cz/google/60/"
+atd.
 
-reaguji na Váš inzerát "KOUPÍM iPhone 16 pro max" za cenu 21 000 Kč v lokalitě Břeclav690 02.
+Pro další značky jsou url stejné akorát se mění název značky. Uprav podle tohoto celý systém scrapování na www.bazos.cz
 
-Hledám právě tento typ zboží a Váš inzerát mě zaujal. Rychle a spolehlivě odkoupím.
-
-Prosím o odpověď s bližšími detaily a možnostmi předání.
-
-Těším se na Vaši odpověď.
-
-S pozdravem,
-Inzerty Bot
-
---
-Tel: [Váš telefon]
-Email: [Váš email]

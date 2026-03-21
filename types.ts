@@ -1,3 +1,30 @@
+// ========================================
+// Multi-Platform Support - Ad Types
+// ========================================
+
+export type AdSource = 
+  | 'bazos_cz' 
+  | 'bazos_sk' 
+  | 'sbazar' 
+  | 'mobilnet' 
+  | 'aukro' 
+  | 'vinted' 
+  | 'facebook_marketplace'
+  | 'hyperinzerce'
+  | 'annonce';
+
+export const AdSourceName: Record<AdSource, string> = {
+  bazos_cz: 'Bazoš.cz',
+  bazos_sk: 'Bazoš.sk',
+  sbazar: 'Sbazar.cz',
+  mobilnet: 'Mobilnet.cz',
+  aukro: 'Aukro.cz',
+  vinted: 'Vinted.cz',
+  facebook_marketplace: 'Facebook Marketplace',
+  hyperinzerce: 'Hyperinzerce.cz',
+  annonce: 'Annonce.cz',
+};
+
 export interface Ad {
   id: string;
   title: string;
@@ -15,6 +42,60 @@ export interface Ad {
   link?: string;
   similarity?: number;
   ai?: boolean;
+  // Multi-platform fields
+  source: AdSource;
+  external_id?: string;
+  posted_at?: string;
+  seller?: {
+    name?: string;
+    phone?: string;
+    rating?: number;
+    verified?: boolean;
+  };
+  metadata?: Record<string, any>;
+}
+
+export interface ScraperResult {
+  ads: Ad[];
+  savedAdsCount: number;
+  error?: string;
+  warnings?: string[];
+  metadata?: {
+    scrapedAt: string;
+    source: AdSource;
+    pagesScraped: number;
+    totalAdsFound: number;
+  };
+}
+
+export interface ScraperConfig {
+  enabled: boolean;
+  source: AdSource;
+  baseUrl: string;
+  categories: {
+    nabidka: string[];
+    poptavka: string[];
+  };
+  selectors: {
+    adList: string;
+    adItem: string;
+    title: string;
+    price: string;
+    link: string;
+    description?: string;
+    location?: string;
+    date?: string;
+    image?: string;
+    seller?: string;
+  };
+  scrapingOptions: {
+    delay: number;
+    jitter: number;
+    maxPages: number;
+    maxAdsPerType: number;
+    stopOnKnownAd: boolean;
+    userAgents: string[];
+  };
 }
 
 export type MatchStatus = 'new' | 'review' | 'contacted' | 'negotiation' | 'closed';
@@ -48,6 +129,9 @@ export interface MatchItem {
   expectedNetProfit?: number;
   locationScore?: number;
   priceTrustScore?: number;
+  similarity?: number;
+  marginScore?: number;
+  freshness?: number;
 }
 
 export interface ScrapeSummaryData {
@@ -85,6 +169,8 @@ export interface Config {
     description?: string;
     location?: string;
   };
+  // Multi-platform support
+  enabledPlatforms?: AdSource[];
 }
 
 

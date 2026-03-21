@@ -74,6 +74,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
     useWebhook: false,
   });
   const [showSheetsConfig, setShowSheetsConfig] = useState(false);
+  const [runningAutomation, setRunningAutomation] = useState<Set<string>>(new Set());
+  const [automationResults, setAutomationResults] = useState<Record<string, any>>({});
 
   useEffect(() => {
     try {
@@ -499,6 +501,107 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ matchedAds, isLoading }
     } catch (error) {
       setAlertsStatus(`❌ Chyba: ${error instanceof Error ? error.message : 'Neznámá chyba'}`);
       setTimeout(() => setAlertsStatus(''), 5000);
+    }
+  };
+
+  const runAutonomousProcess = async (match: MatchItem) => {
+    const matchKey = getMatchKey(match.offer, match.demand);
+    
+    setRunningAutomation((prev) => new Set(prev).add(matchKey));
+    setAutomationResults((prev) => ({ ...prev, [matchKey]: { status: 'running', message: 'Spouštím autonomní proces...' } }));
+
+    try {
+      console.log('[AUTOMATION] Starting automation for matchKey:', matchKey);
+      
+      const requestBody = {
+        matchKey,
+        match: {
+          offer: {
+            title: match.offer.title,
+            price: match.offer.price,
+            location: match.offer.location || '',
+            url: match.offer.url,
+          },
+          demand: {
+            title: match.demand.title,
+            price: match.demand.price,
+            location: match.demand.location || '',
+            url: match.demand.url,
+          },
+          arbitrageScore: match.arbitrageScore,
+          similarityScore: match.similarity,
+          realOpportunityScore: match.realOpportunityScore,
+        },
+      };
+      
+      console.log('[AUTOMATION] Request body:', JSON.stringify(requestBody, null, 2));
+
+      const response = await fetch(`http://localhost:3001/automation/run-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('[AUTOMATION] Response status:', response.status);
+      console.log('[AUTOMATION] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      console.log('[AUTOMATION] Content-Type:', contentType);
+      
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('[AUTOMATION] Non-JSON response:', text.substring(0, 1000));
+        throw new Error(`Server vrátil neočekávanou odpověď (není JSON). Status: ${response.status}. Prvních 500 znaků: ${text.substring(0, 500)}`);
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[AUTOMATION] Error response:', errorData);
+        throw new Error(errorData.message || 'Autonomní proces selhal');
+      }
+
+      const result = await response.json();
+      console.log('[AUTOMATION] Success result:', result);
+      
+      setAutomationResults((prev) => ({ 
+        ...prev, 
+        [matchKey]: { 
+          status: 'success', 
+          message: `Dokončeno: ${result.summary.success}/${result.summary.total} kroků`,
+          data: result 
+        } 
+      }));
+
+      // Show detailed results
+      const successSteps = result.results
+        .filter((r: any) => r.success)
+        .map((r: any) => `✅ ${r.step}: ${r.message}`)
+        .join('\n');
+      
+      const failedSteps = result.results
+        .filter((r: any) => !r.success)
+        .map((r: any) => `❌ ${r.step}: ${r.error || r.message}`)
+        .join('\n');
+
+      alert(`🚀 Autonomní proces dokončen!\n\n${successSteps}${failedSteps ? '\n\n' + failedSteps : ''}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Neznámá chyba';
+      console.error('[AUTOMATION] Error:', error);
+      setAutomationResults((prev) => ({ 
+        ...prev, 
+        [matchKey]: { 
+          status: 'error', 
+          message: errorMessage 
+        } 
+      }));
+      alert(`❌ Autonomní proces selhal: ${errorMessage}`);
+    } finally {
+      setRunningAutomation((prev) => {
+        const next = new Set(prev);
+        next.delete(matchKey);
+        return next;
+      });
     }
   };
 
@@ -948,40 +1051,64 @@ CELKEM: ${match.realOpportunityScore || 0} bodů (0-100)
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {/* AI Message Generation */}
-                <div className="flex gap-2 mb-2 w-full">
-                  <button 
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-white font-medium flex items-center gap-2" 
-                    onClick={() => generateAIMessage(match, 'seller', 'bazos', 'friendly')}
-                    title="AI vygeneruje přirozenou zprávu na základě kontextu obchodu"
+              {/* Autonomous Process Button */}
+              <div className="mt-4 flex flex-wrap gap-3 items-center">
+                <button
+                  onClick={() => runAutonomousProcess(match)}
+                  disabled={runningAutomation.has(matchKey)}
+                  className={`px-5 py-3 rounded-lg font-medium flex items-center gap-2 transition-all ${
+                    runningAutomation.has(matchKey)
+                      ? 'bg-slate-600 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg hover:shadow-xl'
+                  }`}
+                  title="Spustí všechny autonomní kroky: Fraud analýza, Priority scoring, Follow-up scheduling, Analytics, Meeting suggestions"
+                >
+                  {runningAutomation.has(matchKey) ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Probíhá autonomní proces...
+                    </>
+                  ) : (
+                    <>
+                      <span>🚀</span>
+                      Spustit autonomní proces
+                    </>
+                  )}
+                </button>
+
+                {/* Automation Result Status */}
+                {automationResults[matchKey] && (
+                  <div className={`text-sm px-3 py-2 rounded-lg ${
+                    automationResults[matchKey].status === 'success'
+                      ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700'
+                      : automationResults[matchKey].status === 'error'
+                      ? 'bg-rose-900/30 text-rose-400 border border-rose-700'
+                      : 'bg-slate-700 text-slate-300 border border-slate-600'
+                  }`}>
+                    {automationResults[matchKey].message}
+                  </div>
+                )}
+
+                {/* Quick Actions */}
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    className="px-3 py-1 bg-amber-700 hover:bg-amber-600 rounded text-sm"
+                    onClick={() => updateMatchMeta(matchKey, { followUpAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(), followUpState: 'waiting' })}
+                    title="Naplánovat follow-up za 24 hodin"
                   >
-                    <span>🤖</span>
-                    AI zpráva prodávajícímu (Bazoš)
+                    ⏰ Follow-up 24h
                   </button>
-                  <button 
-                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 rounded text-white font-medium flex items-center gap-2" 
-                    onClick={() => generateAIMessage(match, 'buyer', 'bazos', 'friendly')}
-                    title="AI vygeneruje přirozenou zprávu na základě kontextu obchodu"
+                  <button
+                    className="px-3 py-1 bg-rose-700 hover:bg-rose-600 rounded text-sm"
+                    onClick={() => updateMatchMeta(matchKey, { resolved: !meta.resolved })}
+                    title={meta.resolved ? 'Označit jako aktivní' : 'Označit jako vyřešené'}
                   >
-                    <span>🤖</span>
-                    AI zpráva kupujícímu (Bazoš)
+                    {meta.resolved ? '✅ Aktivní' : '❌ Vyřešeno'}
                   </button>
                 </div>
-                
-                {/* Classic Templates */}
-                <div className="flex gap-2">
-                  <button className="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 rounded" onClick={() => copyTemplate(match, 'seller', 'bazos')}>📩 Bazoš zpráva prodávajícímu</button>
-                  <button className="px-3 py-1 bg-cyan-800 hover:bg-cyan-700 rounded" onClick={() => copyTemplate(match, 'seller', 'sms')}>📱 SMS prodávajícímu</button>
-                  <button className="px-3 py-1 bg-cyan-900 hover:bg-cyan-800 rounded" onClick={() => copyTemplate(match, 'seller', 'email')}>📧 E-mail prodávajícímu</button>
-                </div>
-                <div className="flex gap-2">
-                  <button className="px-3 py-1 bg-indigo-700 hover:bg-indigo-600 rounded" onClick={() => copyTemplate(match, 'buyer', 'bazos')}>📩 Bazoš zpráva kupujícímu</button>
-                  <button className="px-3 py-1 bg-indigo-800 hover:bg-indigo-700 rounded" onClick={() => copyTemplate(match, 'buyer', 'sms')}>📱 SMS kupujícímu</button>
-                  <button className="px-3 py-1 bg-indigo-900 hover:bg-indigo-800 rounded" onClick={() => copyTemplate(match, 'buyer', 'email')}>📧 E-mail kupujícímu</button>
-                </div>
-                <button className="px-3 py-1 bg-amber-700 hover:bg-amber-600 rounded" onClick={() => updateMatchMeta(matchKey, { followUpAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(), followUpState: 'waiting' })}>⏰ Připomenout za 24h</button>
-                <button className="px-3 py-1 bg-rose-700 hover:bg-rose-600 rounded" onClick={() => updateMatchMeta(matchKey, { resolved: !meta.resolved })}>{meta.resolved ? '✅ Označit jako aktivní' : '❌ Označit jako vyřešené / nebrat'}</button>
               </div>
             </div>
           );

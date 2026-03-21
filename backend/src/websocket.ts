@@ -68,15 +68,16 @@ class WebSocketService {
 
       // Send welcome message
       this.sendToClient(ws, {
-        type: 'welcome',
+        type: 'verification_code',
         title: 'Připojeno',
         message: 'Real-time notifikace jsou aktivní',
         timestamp: new Date().toISOString(),
         priority: 'low',
+        data: { connected: true },
       });
     });
 
-      console.log(`🚀 WebSocket server running on port ${port}`);
+    console.log(`🚀 WebSocket server running on port ${port}`);
 
       this.wss.on('error', (error) => {
         console.error('WebSocket Server Error:', error);
@@ -211,6 +212,12 @@ class WebSocketService {
       subscribedMatches: this.matchSubscribers.size,
       clients: Array.from(this.clients.keys()),
     };
+  }
+
+  public dispose() {
+    // Cleanup resources
+    this.clients.clear();
+    this.matchSubscribers.clear();
   }
 }
 

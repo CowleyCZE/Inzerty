@@ -2,9 +2,10 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { AdType } from '../types';
-import { GEMINI_MODEL_TEXT } from '../constants.ts'; // Updated extension
+import { GEMINI_MODEL_TEXT } from '../constants.ts';
 
-const API_KEY = import.meta.env.VITE_API_KEY;
+declare const VITE_API_KEY: string;
+const API_KEY = (import.meta as any).env?.VITE_API_KEY || VITE_API_KEY;
 
 if (!API_KEY) {
   console.error("API klíč pro Gemini není nastaven. Vytvořte soubor .env.local a vložte do něj VITE_API_KEY='váš_klíč'. Služba Gemini nebude funkční.");

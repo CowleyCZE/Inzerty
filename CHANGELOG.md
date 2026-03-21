@@ -8,6 +8,59 @@ a projekt dodržuje [Semantic Versioning](https://semver.org/lang/cs/).
 ## [Nevydané]
 
 ### Přidáno
+- **🌍 Multi-Platform Scraping - Fáze 1: Základní architektura** ✅
+  - **Nové typy a interface** (`types.ts`):
+    - `AdSource` - Typ pro všechny podporované platformy (bazos_cz, bazos_sk, sbazar, mobilnet, aukro, atd.)
+    - `AdSourceName` - Přehledné názvy platforem
+    - Rozšířený `Ad` interface o multi-platform pole:
+      - `source` - Odkud inzerát pochází
+      - `external_id` - Externí ID inzerátu
+      - `posted_at` - Datum publikace
+      - `seller` - Informace o prodejci
+      - `metadata` - Dodatečná metadata
+    - `ScraperResult` - Standardizovaný výsledek scrapování
+    - `ScraperConfig` - Konfigurace pro každý scraper
+    - `Config` rozšířen o `enabledPlatforms`
+  
+  - **Scraper architektura** (`backend/src/scrapers/`):
+    - `BaseScraper.ts` - Abstraktní základní třída pro všechny scrapery
+      - HTTP requesty s rotací User-Agent
+      - Rate limiting s jitter
+      - Retry logika s exponenciálním backoff
+      - Anti-detection mechanismy
+      - 429 Too Many Requests handling
+    - `BazosCZScraper.ts` - Implementace pro Bazoš.cz (reference)
+    - `ScraperFactory.ts` - Factory pattern pro vytváření scraperů
+    - `index.ts` - Export všech scraperů
+  
+  - **Databázové změny** (`backend/src/database.ts`):
+    - Nové sloupce v tabulce `ads`:
+      - `source` (TEXT DEFAULT 'bazos_cz')
+      - `external_id` (TEXT)
+      - `posted_at` (TIMESTAMP/TIMESTAMPTZ)
+      - `seller_info` (JSONB pro Postgres, TEXT pro SQLite)
+      - `metadata` (JSONB pro Postgres, TEXT pro SQLite)
+    - Aktualizována `saveAd()` funkce pro ukládání nových polí
+    - Kompatibilní pro SQLite i PostgreSQL
+  
+  - **UI pro výběr platforem** (`components/PlatformSelector.tsx`):
+    - Přehled všech podporovaných platforem
+    - Status pro každou platformu (implemented/coming_soon/planned)
+    - Toggle pro povolení/zakázání platforem
+    - Indikátor objemu inzerátů (high/medium/low)
+    - Integrace do SettingsPage
+    - Visual feedback pro aktivní platformy
+  
+  - **Dostupné platformy**:
+    - ✅ **bazos_cz** - Implementováno
+    - 🔜 **bazos_sk** - Připraveno k implementaci
+    - 📋 **sbazar** - Plánováno
+    - 📋 **mobilnet** - Plánováno
+    - 📋 **aukro** - Plánováno
+    - 📋 **hyperinzerce** - Plánováno
+    - 📋 **annonce** - Plánováno
+
+### Přidáno (pokračování)
 - **Partially Implemented Features - Dokončení** ✅
   - **Email Notifications** - Kompletní implementace
     - UI pro nastavení SMTP (host, port, user, pass, SSL)

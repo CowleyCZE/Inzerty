@@ -6,6 +6,19 @@
 
 | Funkce | Stav | Datum dokončení |
 |--------|------|-----------------|
+| **🌍 Multi-Platform Scraping - Fáze 1** | ✅ **Hotovo** | 2026-03-16 |
+| - AdSource typy pro všechny platformy | ✅ Hotovo | 2026-03-16 |
+| - Rozšířený Ad interface (source, seller, metadata) | ✅ Hotovo | 2026-03-16 |
+| - BaseScraper abstraktní třída | ✅ Hotovo | 2026-03-16 |
+| - BazosCZScraper reference implementace | ✅ Hotovo | 2026-03-16 |
+| - ScraperFactory pattern | ✅ Hotovo | 2026-03-16 |
+| - Databázové sloupce pro multi-platform | ✅ Hotovo | 2026-03-16 |
+| - UI PlatformSelector komponenta | ✅ Hotovo | 2026-03-16 |
+| **🚀 Autonomous Process - One-Click Automation** | ✅ **Hotovo** | 2026-03-16 |
+| - Endpoint /automation/run-all | ✅ Hotovo | 2026-03-16 |
+| - 6 autonomních kroků (fraud, priority, state, follow-up, analytics, meeting) | ✅ Hotovo | 2026-03-16 |
+| - Fallback pro AI nedostupnost | ✅ Hotovo | 2026-03-16 |
+| - UI tlačítko s progress feedbackem | ✅ Hotovo | 2026-03-16 |
 | Inkrementální scraping s checkpointy | ✅ Hotovo | - |
 | Rotace User-Agent + retry logika | ✅ Hotovo | - |
 | Porovnávání inzerátů (AI/Keyword/Auto) | ✅ Hotovo | - |
@@ -71,10 +84,15 @@
 
 | Funkce | Popis | Priorita |
 |--------|-------|----------|
+| **Multi-Platform Scraping - Fáze 2** | Implementace Bazoš.sk scraperu | Vysoká |
+| **Multi-Platform Scraping - Fáze 3** | Implementace Sbazar.cz scraperu | Vysoká |
+| **Multi-Platform Scraping - Fáze 4** | Implementace Mobilnet.cz scraperu | Střední |
+| **Multi-Platform Scraping - Fáze 5** | Implementace Aukro.cz (přes API) | Střední |
+| **Cross-platform matching** | Porovnávání inzerátů mezi platformami | Vysoká |
+| **Unified scraping process** | Spojení všech scraperů do jednoho procesu | Vysoká |
 | Vylepšený Kanban view | Board view s drag & drop kartami | Nízká |
 | Historie změn | Logování všech změn v match_meta | Střední |
 | Vlastní šablony zpráv | UI pro ukládání vlastních šablon | Nízká |
-| Google Sheets export | Integrace s Google Sheets | Nízká |
 | Automatické alerty po scrapingu | Auto-send po dokončení scrapingu | Nízká |
 | Export blacklist/whitelist | Sdílení konfigurace mezi instancemi | Nízká |
 

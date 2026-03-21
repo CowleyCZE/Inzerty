@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 
-interface Notification {
+export interface Notification {
   id: string;
   type: 'match_created' | 'match_updated' | 'fraud_alert' | 'meeting_reminder' | 'verification_code' | 'welcome';
   title: string;
