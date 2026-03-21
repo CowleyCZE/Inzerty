@@ -1,90 +1,19 @@
-import React, { useEffect, useState } from 'react';
-
-interface UserCapacity {
-  max_active_deals: number;
-  current_active_deals: number;
-  available_capacity: number;
-  capacity_percentage: number;
-  preferred_brands: string[];
-  workload_status: 'volný' | 'vytížený' | 'plný';
-}
+import React from 'react';
+import { useUserCapacity } from '../hooks/useUserCapacity';
 
 interface UserCapacityPanelProps {
-  onCapacityChange?: (capacity: UserCapacity) => void;
+  onCapacityChange?: (capacity: any) => void;
 }
 
 const UserCapacityPanel: React.FC<UserCapacityPanelProps> = ({ onCapacityChange }) => {
-  const [capacity, setCapacity] = useState<UserCapacity>({
-    max_active_deals: 10,
-    current_active_deals: 0,
-    available_capacity: 10,
-    capacity_percentage: 0,
-    preferred_brands: [],
-    workload_status: 'volný',
-  });
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    loadCapacity();
-  }, []);
-
-  const loadCapacity = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/priority/user-capacity');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.capacity) {
-          setCapacity(data.capacity);
-        }
-      }
-    } catch (error) {
-      console.error('Chyba při načítání kapacity:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const response = await fetch('http://localhost:3001/priority/user-capacity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(capacity),
-      });
-
-      if (response.ok) {
-        alert('✅ Kapacita uložena!');
-        onCapacityChange?.(capacity);
-      }
-    } catch (error) {
-      alert('❌ Chyba při ukládání kapacity');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleMaxDealsChange = (value: number) => {
-    const newMax = Math.max(1, Math.min(50, value));
-    const available = newMax - capacity.current_active_deals;
-    const percentage = (available / newMax) * 100;
-    
-    setCapacity(prev => ({
-      ...prev,
-      max_active_deals: newMax,
-      available_capacity: available,
-      capacity_percentage: percentage,
-      workload_status: getWorkloadStatus(percentage),
-    }));
-  };
-
-  const getWorkloadStatus = (percentage: number) => {
-    if (percentage >= 50) return 'volný';
-    if (percentage >= 20) return 'vytížený';
-    return 'plný';
-  };
+  const {
+    capacity,
+    loading,
+    saving,
+    handleMaxDealsChange,
+    toggleBrand,
+    handleSave,
+  } = useUserCapacity(onCapacityChange);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -95,139 +24,157 @@ const UserCapacityPanel: React.FC<UserCapacityPanelProps> = ({ onCapacityChange 
     }
   };
 
-  const toggleBrand = (brand: string) => {
-    setCapacity(prev => ({
-      ...prev,
-      preferred_brands: prev.preferred_brands.includes(brand)
-        ? prev.preferred_brands.filter(b => b !== brand)
-        : [...prev.preferred_brands, brand],
-    }));
-  };
-
   const brands = ['Apple', 'Samsung', 'Huawei', 'Xiaomi', 'Motorola', 'Nokia', 'Sony', 'Oppo', 'Realme', 'OnePlus'];
 
   if (loading) {
-    return <div className="text-slate-400">Načítám kapacitu uživatele...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-slate-400 bg-slate-800 rounded-2xl border border-slate-700 animate-pulse shadow-xl">
+        <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4 shadow-lg shadow-sky-500/20"></div>
+        Načítám parametry kapacity...
+      </div>
+    );
   }
 
-  return (
-    <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-sky-400 flex items-center gap-2">
-          <span>👤</span>
-          Sledování kapacity uživatele
-        </h3>
-      </div>
+  const onSaveClick = async () => {
+    const success = await handleSave();
+    if (success) {
+      alert('👤 Parametry kapacity byly uloženy!');
+    } else {
+      alert('❌ Chyba při ukládání kapacity.');
+    }
+  };
 
-      {/* Capacity Overview */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="text-xs text-slate-400 mb-1">Maximální počet obchodů</div>
-          <div className="text-2xl font-bold text-white">{capacity.max_active_deals}</div>
-        </div>
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="text-xs text-slate-400 mb-1">Aktivní obchody</div>
-          <div className="text-2xl font-bold text-blue-400">{capacity.current_active_deals}</div>
-        </div>
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="text-xs text-slate-400 mb-1">Dostupná kapacita</div>
-          <div className={`text-2xl font-bold ${getStatusColor(capacity.workload_status)}`}>
-            {capacity.available_capacity}
+  return (
+    <div className="bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-slate-700 shadow-2xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      
+      {/* Header section */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/50 pb-6">
+        <div className="flex items-center gap-4">
+          <div className="text-3xl p-3 bg-sky-900/40 text-sky-400 border border-sky-800 rounded-2xl shadow-inner">👤</div>
+          <div>
+            <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400 tracking-tight">
+              Kapacita & Preference
+            </h3>
+            <p className="text-slate-400 text-sm mt-0.5 max-w-xs font-medium leading-relaxed opacity-80 italic">
+              Nastavte si limity pro aktivní obchody a preferované značky.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Workload Status */}
-      <div className={`p-4 rounded-lg border-2 ${
-        capacity.workload_status === 'volný' ? 'bg-emerald-900 bg-opacity-20 border-emerald-600' :
-        capacity.workload_status === 'vytížený' ? 'bg-yellow-900 bg-opacity-20 border-yellow-600' :
-        'bg-red-900 bg-opacity-20 border-red-600'
+      {/* Capacity Overview Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: 'Maximální limit', val: capacity.max_active_deals, color: 'text-white' },
+          { label: 'V řešení', val: capacity.current_active_deals, color: 'text-blue-400' },
+          { label: 'Volná místa', val: capacity.available_capacity, color: getStatusColor(capacity.workload_status) },
+        ].map((item, idx) => (
+          <div key={idx} className="bg-slate-900/50 rounded-2xl p-5 border border-slate-700/50 shadow-inner group hover:bg-slate-900/80 transition-all">
+            <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{item.label}</div>
+            <div className={`text-3xl font-black ${item.color} tabular-nums group-hover:scale-110 transition-transform origin-left`}>{item.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Workload Status Banner */}
+      <div className={`p-6 rounded-2xl border-2 transition-all shadow-lg ${
+        capacity.workload_status === 'volný' ? 'bg-emerald-900/10 border-emerald-600/40 shadow-emerald-500/5' :
+        capacity.workload_status === 'vytížený' ? 'bg-yellow-900/10 border-yellow-600/40 shadow-yellow-500/5' :
+        'bg-rose-900/10 border-rose-600/40 shadow-rose-500/5 animate-pulse'
       }`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm text-slate-300">Stav vytížení</div>
-            <div className={`text-xl font-bold ${getStatusColor(capacity.workload_status)}`}>
-              {capacity.workload_status === 'volný' && '🟢 Volný - Může přijímat nové obchody'}
-              {capacity.workload_status === 'vytížený' && '🟡 Vytížený - Omezená kapacita'}
-              {capacity.workload_status === 'plný' && '🔴 Plný - Nedoporučuje se přijímat nové obchody'}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className={`text-4xl p-2 rounded-2xl bg-slate-950/50 border border-white/5`}>
+              {capacity.workload_status === 'volný' ? '🟢' : capacity.workload_status === 'vytížený' ? '🟡' : '🔴'}
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Aktuální vytížení</div>
+              <div className={`text-xl font-black ${getStatusColor(capacity.workload_status)}`}>
+                {capacity.workload_status === 'volný' && 'Můžete přijímat nové obchody'}
+                {capacity.workload_status === 'vytížený' && 'Šetřete síly, jste vytížen(a)'}
+                {capacity.workload_status === 'plný' && 'STOP! Kapacita zcela vyčerpána'}
+              </div>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-slate-400">Využití kapacity</div>
-            <div className={`text-3xl font-bold ${getStatusColor(capacity.workload_status)}`}>
+          <div className="text-center sm:text-right bg-slate-950/30 px-6 py-3 rounded-2xl border border-white/5 shadow-inner">
+            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none mb-1">Využití</div>
+            <div className={`text-3xl font-black tabular-nums ${getStatusColor(capacity.workload_status)}`}>
               {Math.round(capacity.capacity_percentage)}%
             </div>
           </div>
         </div>
       </div>
 
-      {/* Capacity Slider */}
-      <div className="bg-slate-900 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-slate-300">
-            Maximální počet aktivních obchodů
+      {/* Adjust Capacity Slider */}
+      <div className="bg-slate-900/40 rounded-2xl p-6 border border-slate-700/50 shadow-inner group">
+        <div className="flex items-center justify-between mb-4">
+          <label className="text-sm font-black text-slate-300 uppercase tracking-wider">
+            Změnit maximální limit obchodů
           </label>
-          <span className="text-2xl font-bold text-sky-400">{capacity.max_active_deals}</span>
+          <div className="bg-sky-500/10 text-sky-400 px-4 py-1 rounded-full border border-sky-600 text-xl font-black tabular-nums">
+            {capacity.max_active_deals}
+          </div>
         </div>
-        <input
-          type="range"
-          min="1"
-          max="50"
-          value={capacity.max_active_deals}
-          onChange={(e) => handleMaxDealsChange(Number(e.target.value))}
-          className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
-        />
-        <div className="flex justify-between text-xs text-slate-500 mt-1">
+        <div className="relative h-2 rounded-full overflow-hidden bg-slate-800 border border-slate-700">
+           <input
+            type="range"
+            min="1"
+            max="50"
+            value={capacity.max_active_deals}
+            onChange={(e) => handleMaxDealsChange(Number(e.target.value))}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 appearance-none"
+          />
+          <div 
+             className="h-full bg-sky-500 transition-all duration-300 shadow-lg shadow-sky-500/30"
+             style={{ width: `${(capacity.max_active_deals / 50) * 100}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] text-slate-600 font-bold uppercase mt-2 px-1">
           <span>1</span>
           <span>25</span>
           <span>50</span>
         </div>
       </div>
 
-      {/* Preferred Brands */}
-      <div className="bg-slate-900 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-slate-300 mb-3">Preferované značky</h4>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      {/* Preferred Brands Selector */}
+      <div className="bg-slate-900/40 rounded-2xl p-6 border border-slate-700/50 shadow-inner">
+        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Prioritní značky k nákupu</h4>
+        <div className="flex flex-wrap gap-2">
           {brands.map((brand) => (
             <button
               key={brand}
               onClick={() => toggleBrand(brand)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 border transform active:scale-90 ${
                 capacity.preferred_brands.includes(brand)
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                  : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500'
               }`}
             >
-              {capacity.preferred_brands.includes(brand) ? '✅' : '⚪'} {brand}
+              {brand}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Capacity Impact Info */}
-      <div className="bg-sky-900 bg-opacity-20 border border-sky-700 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <span className="text-xl">💡</span>
-          <div className="text-sm text-sky-200">
-            <div className="font-medium mb-1">Jak funguje sledování kapacity:</div>
-            <ul className="list-disc list-inside space-y-1 text-sky-300">
-              <li>Vyšší dostupná kapacita = vyšší priorita pro nové obchody</li>
-              <li>Při plné kapacitě se priorita automaticky snižuje</li>
-              <li>Preferované značky mají vyšší prioritu</li>
-              <li>Kapacita se aktualizuje při změně stavu obchodu</li>
-            </ul>
-          </div>
+      {/* Footer Info & Action */}
+      <div className="flex flex-wrap lg:flex-nowrap gap-6 items-center pt-6 border-t border-slate-700/50">
+        <div className="flex-1 bg-sky-950/20 border border-sky-900/50 rounded-2xl p-4 flex gap-4 transition-all hover:bg-sky-900/30">
+           <div className="text-2xl mt-0.5">💡</div>
+           <p className="text-xs text-sky-200/70 font-medium leading-relaxed italic">
+             Preference značek ovlivňují AI Prioritizaci. Značky, které označíte jako oblíbené, budou mít ve výchozím nastavení skóre priority o <strong>+15 bodů</strong> vyšší.
+           </p>
         </div>
-      </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-slate-700">
+        
         <button
-          onClick={handleSave}
+          onClick={onSaveClick}
           disabled={saving}
-          className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+          className={`whitespace-nowrap px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-xl active:scale-95 disabled:grayscale disabled:opacity-50 ${
+            saving 
+            ? 'bg-slate-700 cursor-wait' 
+            : 'bg-emerald-600 hover:bg-emerald-500 text-white hover:shadow-emerald-500/20'
+          }`}
         >
-          {saving ? '💾 Ukládám...' : '💾 Uložit kapacitu'}
+          {saving ? '📥 Synchronizuji...' : '💾 Uložit nastavení'}
         </button>
       </div>
     </div>

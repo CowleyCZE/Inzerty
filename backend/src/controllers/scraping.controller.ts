@@ -5,6 +5,8 @@
 import type { Request, Response } from 'express';
 import { scrapeAllBrands } from '../services/scraping.service.js';
 import { pushRuntimeLog } from '../utils/logger.js';
+import { ScraperFactory } from '../scrapers/index.js';
+import type { AdSource } from '../../../types.js';
 
 export const scrapeAll = async (req: Request, res: Response): Promise<void> => {
   const { selectors, scrapingOptions } = req.body;
@@ -40,23 +42,56 @@ export const scrapeAllMulti = async (req: Request, res: Response): Promise<void>
   }
 
   try {
-    // TODO: Implement multi-platform scraping using ScraperFactory
-    // For now, use the existing scrapeAllBrands
-    const result = await scrapeAllBrands({}, scrapingOptions || {});
+    let totalOffers = 0;
+    let totalDemands = 0;
+    let totalSaved = 0;
+    const platformResults: Record<string, any> = {};
+    const successPlatforms: string[] = [];
+    
+    const opts = scrapingOptions || {};
+    const safeOptions = {
+      stopOnKnownAd: opts.stopOnKnownAd !== false,
+      maxAdsPerTypePerBrand: Math.max(1, Math.min(500, Number(opts.maxAdsPerTypePerBrand || 50))),
+    };
+
+    for (const platform of platforms) {
+      try {
+        pushRuntimeLog(`Začínám scrape pro platformu ${platform}`, 'system');
+        const scraper = ScraperFactory.create(platform as AdSource);
+
+        const offerResult = await scraper.scrape('nabidka', safeOptions);
+        const demandResult = await scraper.scrape('poptavka', safeOptions);
+
+        const offers = offerResult.ads.length;
+        const demands = demandResult.ads.length;
+        const savedOffers = offerResult.savedAdsCount || 0;
+        const savedDemands = demandResult.savedAdsCount || 0;
+        const saved = savedOffers + savedDemands;
+
+        totalOffers += offers;
+        totalDemands += demands;
+        totalSaved += saved;
+
+        platformResults[platform] = {
+          offers,
+          demands,
+          saved
+        };
+        successPlatforms.push(platform);
+        pushRuntimeLog(`Platforma ${platform} dokončena: Nabídky: ${offers}, Poptávky: ${demands}`, 'success');
+      } catch (err: any) {
+        pushRuntimeLog(`Chyba scrapování platformy ${platform}: ${err.message}`, 'error');
+        console.error(`Během scrapování platformy ${platform} došlo k chybě:`, err);
+      }
+    }
 
     res.json({
-      message: result.message,
+      message: `Scrapování dokončeno! Načteno ${totalOffers} nabídek a ${totalDemands} poptávek; do DB uloženo ${totalSaved} inzerátů z platforem: ${successPlatforms.join(', ')}.`,
       data: {
-        totalAds: result.data.nabidkaCount + result.data.poptavkaCount,
-        totalSaved: result.data.savedNabidkaCount + result.data.savedPoptavkaCount,
-        platformResults: {
-          bazos_cz: {
-            offers: result.data.nabidkaCount,
-            demands: result.data.poptavkaCount,
-            saved: result.data.savedNabidkaCount + result.data.savedPoptavkaCount,
-          },
-        },
-        successPlatforms: ['bazos_cz'],
+        totalAds: totalOffers + totalDemands,
+        totalSaved: totalSaved,
+        platformResults,
+        successPlatforms,
       },
     });
   } catch (error) {

@@ -1,320 +1,174 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useFraudThresholds } from '../hooks/useFraudThresholds';
 
-interface FraudThresholds {
-  low_risk_max: number;
-  medium_risk_max: number;
-  high_risk_max: number;
-  critical_risk_min: number;
-  auto_watchlist_threshold: number;
-  enabled: boolean;
-}
+// Sub-components
+import { RiskZoneSlider } from './Settings/RiskZoneSlider';
 
 const FraudThresholdsPanel: React.FC = () => {
-  const [thresholds, setThresholds] = useState<FraudThresholds>({
-    low_risk_max: 24,
-    medium_risk_max: 49,
-    high_risk_max: 79,
-    critical_risk_min: 80,
-    auto_watchlist_threshold: 80,
-    enabled: true,
-  });
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    loadThresholds();
-  }, []);
-
-  const loadThresholds = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/fraud/thresholds');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.thresholds) {
-          setThresholds(data.thresholds);
-        }
-      }
-    } catch (error) {
-      console.error('Chyba při načítání prahů:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    // Validate thresholds
-    if (thresholds.low_risk_max >= thresholds.medium_risk_max) {
-      alert('⚠️ Low risk maximum musí být menší než Medium risk maximum');
-      return;
-    }
-    if (thresholds.medium_risk_max >= thresholds.high_risk_max) {
-      alert('⚠️ Medium risk maximum musí být menší než High risk maximum');
-      return;
-    }
-    if (thresholds.high_risk_max >= thresholds.critical_risk_min) {
-      alert('⚠️ High risk maximum musí být menší než Critical risk minimum');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const response = await fetch('http://localhost:3001/fraud/thresholds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(thresholds),
-      });
-
-      if (response.ok) {
-        alert('✅ Prahové hodnoty uloženy!');
-      }
-    } catch (error) {
-      alert('❌ Chyba při ukládání prahových hodnot');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resetToDefault = () => {
-    setThresholds({
-      low_risk_max: 24,
-      medium_risk_max: 49,
-      high_risk_max: 79,
-      critical_risk_min: 80,
-      auto_watchlist_threshold: 80,
-      enabled: true,
-    });
-  };
+  const {
+    thresholds,
+    loading,
+    saving,
+    handleSave,
+    resetToDefault,
+    updateThreshold,
+  } = useFraudThresholds();
 
   if (loading) {
-    return <div className="text-slate-400">Načítám prahové hodnoty...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-slate-400 bg-slate-800 rounded-2xl border border-slate-700 animate-pulse">
+        <svg className="animate-spin h-8 w-8 mb-4 text-rose-500" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        Načítám parametry rizik...
+      </div>
+    );
   }
 
+  const onSaveClick = async () => {
+    const success = await handleSave();
+    if (success) {
+      alert('🔒 Prahové hodnoty rizik byly úspešně uloženy!');
+    } else {
+      alert('❌ Chyba při ukládání prahových hodnot. Zkontrolujte validitu rozsahů.');
+    }
+  };
+
   return (
-    <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-sky-400 flex items-center gap-2">
-          <span>⚖️</span>
-          Prahové hodnoty pro Fraud Detection
-        </h3>
+    <div className="bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 md:p-8 border border-slate-700 shadow-2xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      
+      {/* Header section */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/50 pb-6">
+        <div className="flex items-center gap-4">
+          <div className="text-3xl p-3 bg-rose-900/40 text-rose-400 border border-rose-800 rounded-2xl shadow-inner">🛡️</div>
+          <div>
+            <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-orange-400 tracking-tight">
+              Fraud Detection Prahy
+            </h3>
+            <p className="text-slate-400 text-sm mt-0.5 max-w-xs font-medium leading-relaxed opacity-80 italic">
+              Definujte citlivost detekčního systému na podezřelé inzeráty a podvody.
+            </p>
+          </div>
+        </div>
+        
         <button
           onClick={resetToDefault}
-          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 bg-slate-750 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 shadow-lg"
         >
-          🔄 Výchozí hodnoty
+          🔄 Výchozí prahy
         </button>
       </div>
 
       {/* Enable/Disable Toggle */}
-      <div className="flex items-center justify-between p-4 bg-slate-900 rounded-lg">
-        <div>
-          <div className="font-medium text-slate-200">Povolit vlastní prahy</div>
-          <div className="text-sm text-slate-400">Při vypnutí se použijí výchozí hodnoty</div>
+      <div className="flex items-center justify-between p-5 bg-slate-900/50 rounded-2xl border border-slate-700/50 group transition-all hover:bg-slate-900/80">
+        <div className="flex items-center gap-4">
+          <div className={`p-2 rounded-xl transition-colors ${thresholds.enabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+            {thresholds.enabled ? '🟢' : '⚪'}
+          </div>
+          <div>
+            <div className="font-bold text-slate-100 group-hover:text-white">Povolit vlastní prahy rizik</div>
+            <div className="text-xs text-slate-500 font-medium">Při vypnutí se použijí systémové výchozí hodnoty (vhodné pro začátečníky)</div>
+          </div>
         </div>
         <button
-          onClick={() => setThresholds(s => ({ ...s, enabled: !s.enabled }))}
-          className={`relative w-16 h-8 rounded-full transition-colors ${
-            thresholds.enabled ? 'bg-green-600' : 'bg-slate-600'
+          onClick={() => updateThreshold('enabled', !thresholds.enabled)}
+          className={`relative w-14 h-7 rounded-full transition-all shadow-inner ${
+            thresholds.enabled ? 'bg-emerald-600 shadow-emerald-900/50' : 'bg-slate-700'
           }`}
         >
           <div
-            className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-transform ${
-              thresholds.enabled ? 'left-9' : 'left-1'
+            className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-transform shadow-md ${
+              thresholds.enabled ? 'translate-x-8' : 'translate-x-1'
             }`}
           ></div>
         </button>
       </div>
 
-      {/* Threshold Sliders */}
-      <div className="space-y-6">
-        {/* Low Risk Max */}
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🟢</span>
-              <div>
-                <div className="font-medium text-slate-200">Low Risk (Nízké riziko)</div>
-                <div className="text-xs text-slate-400">Skóre 0 - {thresholds.low_risk_max}</div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-emerald-400 w-16 text-right">
-              {thresholds.low_risk_max}
-            </div>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="40"
-            value={thresholds.low_risk_max}
-            onChange={(e) => setThresholds(s => ({ ...s, low_risk_max: Number(e.target.value) }))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-            disabled={!thresholds.enabled}
-          />
-        </div>
-
-        {/* Medium Risk Max */}
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🟡</span>
-              <div>
-                <div className="font-medium text-slate-200">Medium Risk (Střední riziko)</div>
-                <div className="text-xs text-slate-400">Skóre {thresholds.low_risk_max + 1} - {thresholds.medium_risk_max}</div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-yellow-400 w-16 text-right">
-              {thresholds.medium_risk_max}
-            </div>
-          </div>
-          <input
-            type="range"
-            min="25"
-            max="60"
-            value={thresholds.medium_risk_max}
-            onChange={(e) => setThresholds(s => ({ ...s, medium_risk_max: Number(e.target.value) }))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-            disabled={!thresholds.enabled}
-          />
-        </div>
-
-        {/* High Risk Max */}
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🟠</span>
-              <div>
-                <div className="font-medium text-slate-200">High Risk (Vysoké riziko)</div>
-                <div className="text-xs text-slate-400">Skóre {thresholds.medium_risk_max + 1} - {thresholds.high_risk_max}</div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-orange-400 w-16 text-right">
-              {thresholds.high_risk_max}
-            </div>
-          </div>
-          <input
-            type="range"
-            min="50"
-            max="85"
-            value={thresholds.high_risk_max}
-            onChange={(e) => setThresholds(s => ({ ...s, high_risk_max: Number(e.target.value) }))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
-            disabled={!thresholds.enabled}
-          />
-        </div>
-
-        {/* Critical Risk Min */}
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🔴</span>
-              <div>
-                <div className="font-medium text-slate-200">Critical Risk (Kritické riziko)</div>
-                <div className="text-xs text-slate-400">Skóre {thresholds.critical_risk_min} - 100</div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-red-400 w-16 text-right">
-              {thresholds.critical_risk_min}
-            </div>
-          </div>
-          <input
-            type="range"
-            min="70"
-            max="100"
-            value={thresholds.critical_risk_min}
-            onChange={(e) => setThresholds(s => ({ ...s, critical_risk_min: Number(e.target.value) }))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-500"
-            disabled={!thresholds.enabled}
-          />
-        </div>
-
-        {/* Auto Watchlist Threshold */}
-        <div className="bg-slate-900 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📋</span>
-              <div>
-                <div className="font-medium text-slate-200">Auto Watchlist</div>
-                <div className="text-xs text-slate-400">Při skóre ≥ {thresholds.auto_watchlist_threshold} automaticky na watchlist</div>
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-purple-400 w-16 text-right">
-              {thresholds.auto_watchlist_threshold}
-            </div>
-          </div>
-          <input
-            type="range"
-            min="50"
-            max="100"
-            value={thresholds.auto_watchlist_threshold}
-            onChange={(e) => setThresholds(s => ({ ...s, auto_watchlist_threshold: Number(e.target.value) }))}
-            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-            disabled={!thresholds.enabled}
-          />
-        </div>
-      </div>
-
-      {/* Visual Representation */}
-      <div className="bg-slate-900 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-slate-300 mb-3">Vizualizace rizikových zón</h4>
-        <div className="w-full h-8 rounded-full overflow-hidden flex">
-          <div 
-            className="bg-emerald-500 transition-all flex items-center justify-center text-xs text-white font-medium"
-            style={{ width: `${(thresholds.low_risk_max / 100) * 100}%` }}
-          >
-            Low
-          </div>
-          <div 
-            className="bg-yellow-500 transition-all flex items-center justify-center text-xs text-white font-medium"
-            style={{ width: `${((thresholds.medium_risk_max - thresholds.low_risk_max) / 100) * 100}%` }}
-          >
-            Medium
-          </div>
-          <div 
-            className="bg-orange-500 transition-all flex items-center justify-center text-xs text-white font-medium"
-            style={{ width: `${((thresholds.high_risk_max - thresholds.medium_risk_max) / 100) * 100}%` }}
-          >
-            High
-          </div>
-          <div 
-            className="bg-red-500 transition-all flex items-center justify-center text-xs text-white font-medium"
-            style={{ width: `${((100 - thresholds.high_risk_max) / 100) * 100}%` }}
-          >
-            Critical
-          </div>
-        </div>
-        <div className="flex justify-between text-xs text-slate-500 mt-2">
-          <span>0</span>
-          <span>25</span>
-          <span>50</span>
-          <span>75</span>
-          <span>100</span>
-        </div>
-      </div>
-
-      {/* Info Box */}
-      <div className="bg-sky-900 bg-opacity-20 border border-sky-700 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <span className="text-xl">💡</span>
-          <div className="text-sm text-sky-200">
-            <div className="font-medium mb-1">Jak fungují prahové hodnoty:</div>
-            <ul className="list-disc list-inside space-y-1 text-sky-300">
-              <li>Low Risk (0-{thresholds.low_risk_max}): Bezpečné obchody, žádná akce</li>
-              <li>Medium Risk ({thresholds.low_risk_max + 1}-{thresholds.medium_risk_max}): Střední riziko, doporučeno zkontrolovat</li>
-              <li>High Risk ({thresholds.medium_risk_max + 1}-{thresholds.high_risk_max}): Vysoké riziko, upozornění</li>
-              <li>Critical Risk ({thresholds.critical_risk_min}-100): Kritické, automaticky na watchlist pokud ≥ {thresholds.auto_watchlist_threshold}</li>
-            </ul>
+      {/* Risk Zone Sliders */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <RiskZoneSlider 
+          label="Nízké riziko" 
+          rangeText={`Skóre 0 - ${thresholds.low_risk_max}`} 
+          icon="🟢" 
+          value={thresholds.low_risk_max} 
+          min={0} max={40} 
+          colorClass="accent-emerald-500" 
+          disabled={!thresholds.enabled} 
+          onChange={(v) => updateThreshold('low_risk_max', v)} 
+        />
+        <RiskZoneSlider 
+          label="Střední riziko" 
+          rangeText={`Skóre ${thresholds.low_risk_max + 1} - ${thresholds.medium_risk_max}`} 
+          icon="🟡" 
+          value={thresholds.medium_risk_max} 
+          min={25} max={60} 
+          colorClass="accent-yellow-500" 
+          disabled={!thresholds.enabled} 
+          onChange={(v) => updateThreshold('medium_risk_max', v)} 
+        />
+        <RiskZoneSlider 
+          label="Vysoké riziko" 
+          rangeText={`Skóre ${thresholds.medium_risk_max + 1} - ${thresholds.high_risk_max}`} 
+          icon="🟠" 
+          value={thresholds.high_risk_max} 
+          min={50} max={85} 
+          colorClass="accent-orange-500" 
+          disabled={!thresholds.enabled} 
+          onChange={(v) => updateThreshold('high_risk_max', v)} 
+        />
+        <RiskZoneSlider 
+          label="Kritické riziko" 
+          rangeText={`Skóre ${thresholds.critical_risk_min} - 100`} 
+          icon="🔴" 
+          value={thresholds.critical_risk_min} 
+          min={70} max={100} 
+          colorClass="accent-red-500" 
+          disabled={!thresholds.enabled} 
+          onChange={(v) => updateThreshold('critical_risk_min', v)} 
+        />
+        <RiskZoneSlider 
+          label="Auto Watchlist" 
+          rangeText={`Automaticky přidat při skóre ≥ ${thresholds.auto_watchlist_threshold}`} 
+          icon="📋" 
+          value={thresholds.auto_watchlist_threshold} 
+          min={50} max={100} 
+          colorClass="accent-purple-500" 
+          disabled={!thresholds.enabled} 
+          onChange={(v) => updateThreshold('auto_watchlist_threshold', v)} 
+        />
+        
+        {/* Risk Breakdown Summary */}
+        <div className="bg-slate-900/40 rounded-2xl p-5 border border-slate-700/50 flex flex-col justify-center">
+          <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Aktuální riziková mapa</h4>
+          <div className="w-full h-10 rounded-xl overflow-hidden flex border border-slate-950 shadow-inner">
+            <div className="bg-emerald-500/80 transition-all flex items-center justify-center text-[10px] font-black text-white" style={{ width: `${thresholds.low_risk_max}%` }}>LOW</div>
+            <div className="bg-yellow-500/80 transition-all flex items-center justify-center text-[10px] font-black text-white" style={{ width: `${thresholds.medium_risk_max - thresholds.low_risk_max}%` }}>MED</div>
+            <div className="bg-orange-500/80 transition-all flex items-center justify-center text-[10px] font-black text-white" style={{ width: `${thresholds.high_risk_max - thresholds.medium_risk_max}%` }}>HIGH</div>
+            <div className="bg-red-500/80 transition-all flex items-center justify-center text-[10px] font-black text-white" style={{ width: `${100 - thresholds.high_risk_max}%` }}>CRIT</div>
           </div>
         </div>
       </div>
 
-      {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-slate-700">
+      {/* Info & Footer */}
+      <div className="flex flex-wrap lg:flex-nowrap gap-6 items-center pt-6 border-t border-slate-700/50">
+        <div className="flex-1 bg-sky-950/20 border border-sky-900/50 rounded-2xl p-4 flex gap-4">
+           <div className="text-2xl mt-0.5">💡</div>
+           <p className="text-xs text-sky-200/70 font-medium leading-relaxed italic">
+             Čím <strong>nižší</strong> prahy nastavíte, tím <strong>přísnější</strong> bude systém. Pro bazarové inzeráty doporučujeme ponechat Low Risk hranici pod 30 body.
+           </p>
+        </div>
+        
         <button
-          onClick={handleSave}
+          onClick={onSaveClick}
           disabled={saving || !thresholds.enabled}
-          className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+          className={`whitespace-nowrap px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-xl active:scale-95 disabled:grayscale disabled:opacity-50 ${
+            saving 
+            ? 'bg-slate-700 cursor-wait' 
+            : 'bg-emerald-600 hover:bg-emerald-500 text-white hover:shadow-emerald-500/20'
+          }`}
         >
-          {saving ? '💾 Ukládám...' : '💾 Uložit prahy'}
+          {saving ? '📥 Synchronizuji...' : '💾 Uložit prahy'}
         </button>
       </div>
     </div>

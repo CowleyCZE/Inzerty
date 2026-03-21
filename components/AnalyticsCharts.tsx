@@ -1,57 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useAnalytics } from '../hooks/useAnalytics';
 
-interface AnalyticsData {
-  total_deals: number;
-  closed_deals: number;
-  avg_profit: number;
-  avg_time_to_close: number;
-  total_revenue: number;
-  avg_success_rate: number;
-}
+// Sub-components
+import { AnalyticsMetricsGrid } from './Settings/AnalyticsMetricsGrid';
+import { AnalyticsChartsSection } from './Settings/AnalyticsChartsSection';
 
 interface AnalyticsChartsProps {
   period?: number; // days, default 30
 }
 
 const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ period = 30 }) => {
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [deals, setDeals] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [period]);
-
-  const fetchAnalytics = async () => {
-    setLoading(true);
-    try {
-      const [analyticsRes, dealsRes] = await Promise.all([
-        fetch('http://localhost:3001/analytics'),
-        fetch(`http://localhost:3001/analytics/period/${period}`),
-      ]);
-
-      if (analyticsRes.ok) {
-        const data = await analyticsRes.json();
-        setAnalytics(data.analytics);
-      }
-
-      if (dealsRes.ok) {
-        const data = await dealsRes.json();
-        setDeals(data.deals || []);
-      }
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { analytics, deals, loading } = useAnalytics(period);
 
   if (loading) {
-    return <div className="text-slate-400">Načítám analytics...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-slate-400 bg-slate-900/20 rounded-3xl border border-slate-800 animate-pulse shadow-2xl">
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6 shadow-lg shadow-emerald-500/20"></div>
+        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400">Archivace & Výpočty metrik...</div>
+      </div>
+    );
   }
 
   if (!analytics) {
-    return <div className="text-slate-400">Žádná analytics data k dispozici</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-slate-400 bg-slate-800/20 rounded-3xl border border-slate-700 shadow-xl">
+        <div className="text-4xl mb-4 grayscale opacity-40">📊</div>
+        <div className="text-xs font-black uppercase tracking-widest text-slate-500">Žádná analytická data k dispozici</div>
+      </div>
+    );
   }
 
   const successRate = analytics.total_deals > 0
@@ -59,186 +35,30 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ period = 30 }) => {
     : '0';
 
   return (
-    <div className="space-y-6">
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <div className="text-xs text-slate-400 mb-1">Celkem obchodů</div>
-          <div className="text-2xl font-bold text-white">{analytics.total_deals}</div>
+    <div className="space-y-10 animate-in fade-in duration-700">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-700/50 pb-6 px-2">
+        <div>
+          <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-sky-400 uppercase tracking-tighter italic">Obchodní Analytika</h2>
+          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-0.5 ml-0.5 opacity-80 leading-none">Historický přehled transakcí a výkonnosti</p>
         </div>
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <div className="text-xs text-slate-400 mb-1">Dokončeno</div>
-          <div className="text-2xl font-bold text-green-400">{analytics.closed_deals}</div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <div className="text-xs text-slate-400 mb-1">Průměrný zisk</div>
-          <div className="text-xl font-bold text-emerald-400">
-            {analytics.avg_profit ? Math.round(analytics.avg_profit).toLocaleString() : '0'} Kč
-          </div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <div className="text-xs text-slate-400 mb-1">Celkový revenue</div>
-          <div className="text-xl font-bold text-sky-400">
-            {analytics.total_revenue ? Math.round(analytics.total_revenue).toLocaleString() : '0'} Kč
-          </div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <div className="text-xs text-slate-400 mb-1">Čas k uzavření</div>
-          <div className="text-xl font-bold text-purple-400">
-            {analytics.avg_time_to_close ? Math.round(analytics.avg_time_to_close) : '0'}h
-          </div>
-        </div>
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <div className="text-xs text-slate-400 mb-1">Úspěšnost</div>
-          <div className="text-2xl font-bold text-yellow-400">{successRate}%</div>
+        <div className="flex items-center gap-2 px-3 py-1 bg-slate-900 border border-slate-800 rounded-full shadow-inner">
+           <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Sledované období:</span>
+           <span className="text-[10px] bg-sky-950/40 text-sky-400 px-2.5 py-0.5 rounded-full border border-sky-900/50 font-black tabular-nums">{period} DNÍ</span>
         </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold text-sky-400 mb-4">💰 Revenue Overview</h3>
-          <div className="h-48 flex items-end justify-between gap-2">
-            {deals.slice(0, 12).map((deal, idx) => {
-              const height = analytics.total_revenue > 0
-                ? Math.max(10, (deal.final_profit / analytics.total_revenue) * 100)
-                : 10;
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className="w-full bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t transition-all hover:from-emerald-500 hover:to-emerald-300"
-                    style={{ height: `${height}%` }}
-                    title={`${deal.final_profit ? Math.round(deal.final_profit) : 0} Kč`}
-                  ></div>
-                  <div className="text-xs text-slate-500 rotate-45 origin-top-left">
-                    {deal.closed_at ? new Date(deal.closed_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' }) : 'N/A'}
-                  </div>
-                </div>
-              );
-            })}
-            {deals.length === 0 && (
-              <div className="w-full h-full flex items-center justify-center text-slate-500">
-                Žádná data
-              </div>
-            )}
-          </div>
-        </div>
+      <AnalyticsMetricsGrid analytics={analytics} successRate={successRate} />
+      
+      <div className="mt-8">
+        <AnalyticsChartsSection analytics={analytics} deals={deals} successRate={successRate} />
+      </div>
 
-        {/* Success Rate Chart */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold text-yellow-400 mb-4">📊 Success Rate</h3>
-          <div className="flex items-center justify-center h-48">
-            <div className="relative w-40 h-40">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                {/* Background circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#334155"
-                  strokeWidth="12"
-                />
-                {/* Progress circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke={Number(successRate) >= 70 ? '#10b981' : Number(successRate) >= 40 ? '#f59e0b' : '#ef4444'}
-                  strokeWidth="12"
-                  strokeDasharray={`${Number(successRate) * 2.51} 251`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-white">{successRate}%</div>
-                  <div className="text-xs text-slate-400">úspěšnost</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-center gap-6 mt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="text-sm text-slate-400">Dokončeno ({analytics.closed_deals})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-slate-600"></div>
-              <span className="text-sm text-slate-400">Otevřeno ({analytics.total_deals - analytics.closed_deals})</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Time to Close Chart */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold text-purple-400 mb-4">⏱️ Čas k uzavření (hodiny)</h3>
-          <div className="h-48 flex items-end gap-2">
-            {deals.filter(d => d.time_to_close_hours).slice(0, 7).map((deal, idx) => {
-              const hours = Math.round(deal.time_to_close_hours);
-              const maxHours = Math.max(...deals.map(d => Math.round(d.time_to_close_hours) || 0));
-              const height = maxHours > 0 ? (hours / maxHours) * 100 : 10;
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="text-xs text-slate-400">{hours}h</div>
-                  <div
-                    className="w-full bg-gradient-to-t from-purple-600 to-purple-400 rounded-t transition-all hover:from-purple-500 hover:to-purple-300"
-                    style={{ height: `${height}%` }}
-                  ></div>
-                  <div className="text-xs text-slate-500">#{idx + 1}</div>
-                </div>
-              );
-            })}
-            {deals.filter(d => d.time_to_close_hours).length === 0 && (
-              <div className="w-full h-full flex items-center justify-center text-slate-500">
-                Žádná data
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Profit Distribution */}
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold text-emerald-400 mb-4">📈 Distribuce zisků</h3>
-          <div className="space-y-3">
-            {(() => {
-              const ranges = [
-                { label: '> 5000 Kč', min: 5000, count: 0, color: 'bg-green-500' },
-                { label: '2000 - 5000 Kč', min: 2000, max: 5000, count: 0, color: 'bg-emerald-500' },
-                { label: '1000 - 2000 Kč', min: 1000, max: 2000, count: 0, color: 'bg-yellow-500' },
-                { label: '< 1000 Kč', min: 0, max: 1000, count: 0, color: 'bg-orange-500' },
-              ];
-
-              deals.forEach(deal => {
-                const profit = deal.final_profit || 0;
-                ranges.forEach(range => {
-                  if (range.max === undefined) {
-                    if (profit >= range.min) range.count++;
-                  } else if (profit >= range.min && profit < range.max) {
-                    range.count++;
-                  }
-                });
-              });
-
-              const maxCount = Math.max(...ranges.map(r => r.count));
-
-              return ranges.map((range, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <div className="w-28 text-xs text-slate-400">{range.label}</div>
-                  <div className="flex-1 bg-slate-700 rounded-full h-4">
-                    <div
-                      className={`${range.color} h-4 rounded-full transition-all`}
-                      style={{ width: `${maxCount > 0 ? (range.count / maxCount) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                  <div className="w-12 text-xs text-slate-300 text-right">{range.count}</div>
-                </div>
-              ));
-            })()}
-          </div>
-        </div>
+      <div className="bg-slate-950/30 border border-slate-900 rounded-2xl p-4 flex gap-4 items-center group transition-colors hover:bg-slate-950/50">
+        <div className="text-xl pl-2 group-hover:scale-110 transition-transform">📊</div>
+        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest italic leading-relaxed">
+          Tato data jsou generována z historických logů a stavu "DOKONČENO" v databázi. 
+          Případné anomálie v datech mohou být způsobeny ručními úpravami v souboru <code className="text-slate-500 font-mono">matches.json</code>.
+        </p>
       </div>
     </div>
   );

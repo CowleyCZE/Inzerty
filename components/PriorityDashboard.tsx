@@ -1,307 +1,152 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { usePriorityDashboard } from '../hooks/usePriorityDashboard';
+
+// Sub-components
+import { PriorityStatsGrid } from './PriorityDashboard/PriorityStatsGrid';
+import { PriorityMatchTable } from './PriorityDashboard/PriorityMatchTable';
+
+// Lazy-loaded or separate panels
 import UserCapacityPanel from './UserCapacityPanel';
 import HistoricalAccuracyPanel from './HistoricalAccuracyPanel';
 import AutoPrioritizationPanel from './AutoPrioritizationPanel';
 import RealMarketTrendsPanel from './RealMarketTrendsPanel';
 
-interface PrioritizedMatch {
-  matchKey: string;
-  overallScore: number;
-  recommendation: 'prioritize' | 'normal' | 'skip';
-  offer: { title: string; price: string };
-  demand: { title: string; price: string };
-  arbitrageScore: number;
-  calculatedAt: string;
-}
-
-interface PriorityStats {
-  totalMatches: number;
-  prioritizeCount: number;
-  normalCount: number;
-  skipCount: number;
-  avgScore: number;
-}
-
 const PriorityDashboard: React.FC = () => {
-  const [matches, setMatches] = useState<PrioritizedMatch[]>([]);
-  const [stats, setStats] = useState<PriorityStats | null>(null);
-  const [filter, setFilter] = useState<'all' | 'prioritize' | 'normal' | 'skip'>('all');
-  const [loading, setLoading] = useState(true);
-  const [recalculating, setRecalculating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'capacity' | 'accuracy' | 'auto' | 'trends'>('overview');
-
-  useEffect(() => {
-    loadPriorities();
-  }, []);
-
-  const loadPriorities = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('http://localhost:3001/priority/dashboard');
-      if (response.ok) {
-        const data = await response.json();
-        setMatches(data.matches || []);
-        setStats(data.stats || null);
-      }
-    } catch (error) {
-      console.error('Chyba při načítání priorit:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const recalculateAll = async () => {
-    setRecalculating(true);
-    try {
-      const response = await fetch('http://localhost:3001/priority/recalculate-all', {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        loadPriorities();
-      }
-    } catch (error) {
-      console.error('Chyba při přepočítávání:', error);
-    } finally {
-      setRecalculating(false);
-    }
-  };
-
-  const filteredMatches = filter === 'all'
-    ? matches
-    : matches.filter(m => m.recommendation === filter);
+  const {
+    stats,
+    filter,
+    setFilter,
+    loading,
+    recalculating,
+    activeTab,
+    setActiveTab,
+    filteredMatches,
+    recalculateAll,
+  } = usePriorityDashboard();
 
   const getRecommendationColor = (rec: string) => {
     switch (rec) {
-      case 'prioritize': return 'bg-emerald-600';
-      case 'normal': return 'bg-blue-600';
-      case 'skip': return 'bg-red-600';
+      case 'prioritize': return 'bg-emerald-600 shadow-emerald-900/40';
+      case 'normal': return 'bg-blue-600 shadow-blue-900/40';
+      case 'skip': return 'bg-rose-600 shadow-rose-900/40';
       default: return 'bg-slate-600';
     }
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-400';
-    if (score >= 60) return 'text-blue-400';
-    if (score >= 40) return 'text-yellow-400';
-    return 'text-red-400';
+    if (score >= 80) return 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]';
+    if (score >= 60) return 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.3)]';
+    if (score >= 40) return 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.3)]';
+    return 'text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,113,0.3)]';
   };
 
-  if (loading) {
-    return <div className="text-slate-400">Načítám priority...</div>;
+  if (loading && !recalculating) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-slate-400 animate-pulse bg-slate-900/20 rounded-3xl border border-slate-800 shadow-2xl">
+        <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-6 shadow-lg shadow-sky-500/20"></div>
+        <div className="text-sm font-black uppercase tracking-widest text-sky-400">Analýza priorit v reálném čase...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header with Tabs */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-2xl font-semibold text-sky-400 flex items-center gap-2">
-          <span>🎯</span>
-          AI Priority Dashboard
+    <div className="space-y-8 animate-in fade-in duration-700">
+      
+      {/* Header with Glassmorphism Navigation */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 bg-slate-800/40 backdrop-blur-xl p-3 pl-6 pr-3 rounded-2xl border border-slate-700/50 shadow-2xl sticky top-4 z-40">
+        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400 flex items-center gap-3 tracking-tighter uppercase italic">
+          <span className="text-3xl not-italic">🎯</span>
+          AI Dashboard
         </h2>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'overview' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'
-            }`}
-          >
-            📊 Přehled
-          </button>
-          <button
-            onClick={() => setActiveTab('capacity')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'capacity' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'
-            }`}
-          >
-            👤 Kapacita
-          </button>
-          <button
-            onClick={() => setActiveTab('accuracy')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'accuracy' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'
-            }`}
-          >
-            🎯 Přesnost
-          </button>
-          <button
-            onClick={() => setActiveTab('auto')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'auto' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'
-            }`}
-          >
-            🤖 Automatizace
-          </button>
-          <button
-            onClick={() => setActiveTab('trends')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'trends' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'
-            }`}
-          >
-            📈 Tržní trendy
-          </button>
+        
+        <div className="flex items-center gap-1.5 p-1 bg-slate-950/40 rounded-xl border border-slate-800/50 shadow-inner overflow-x-auto w-full lg:w-auto no-scrollbar">
+          {[
+            { id: 'overview', label: '📊 Přehled', color: 'sky' },
+            { id: 'capacity', label: '👤 Kapacita', color: 'indigo' },
+            { id: 'accuracy', label: '📈 Přesnost', color: 'emerald' },
+            { id: 'auto', label: '🤖 Autopilot', color: 'amber' },
+            { id: 'trends', label: '🌊 Trendy', color: 'purple' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`whitespace-nowrap px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 ${
+                activeTab === tab.id 
+                  ? `bg-${tab.color}-600/20 text-${tab.color}-400 ring-2 ring-${tab.color}-600/40 shadow-xl shadow-${tab.color}-900/10` 
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Content Orchestrator */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-300">Přehled priorit</h3>
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="px-2">
+              <h3 className="text-xl font-black text-slate-100 uppercase tracking-tighter italic">Analytický Report</h3>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-0.5 ml-0.5">Stav k: {new Date().toLocaleDateString('cs-CZ')}</p>
+            </div>
+            
             <button
               onClick={recalculateAll}
               disabled={recalculating}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+              className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all shadow-xl active:scale-95 disabled:grayscale ${
+                recalculating 
+                ? 'bg-slate-700 animate-pulse cursor-wait' 
+                : 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white hover:shadow-sky-500/20'
+              }`}
             >
-              {recalculating ? '🔄 Přepočítávám...' : '🔄 Přepočítat všechny'}
+              <span className={`text-sm transition-transform duration-700 ${recalculating ? 'animate-spin' : 'group-hover:rotate-180'}`}>🔄</span>
+              {recalculating ? 'Probíhá výpočet...' : 'Přepočítat AI modely'}
             </button>
           </div>
 
-          {/* Stats Overview */}
-          {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-400">Celkem obchodů</div>
-                <div className="text-2xl font-bold text-white">{stats.totalMatches}</div>
-              </div>
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-400">🔥 Prioritizovat</div>
-                <div className="text-2xl font-bold text-emerald-400">{stats.prioritizeCount}</div>
-              </div>
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-400">📋 Normální</div>
-                <div className="text-2xl font-bold text-blue-400">{stats.normalCount}</div>
-              </div>
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-400">⚠️ Přeskočit</div>
-                <div className="text-2xl font-bold text-red-400">{stats.skipCount}</div>
-              </div>
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-400">Průměrné skóre</div>
-                <div className={`text-2xl font-bold ${getScoreColor(stats.avgScore)}`}>
-                  {Math.round(stats.avgScore)}
-                </div>
-              </div>
-            </div>
-          )}
+          <PriorityStatsGrid stats={stats} getScoreColor={getScoreColor} />
 
-          {/* Filter Controls */}
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400 text-sm">Filtr:</span>
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-sm ${filter === 'all' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'}`}
-            >
-              Všechny ({matches.length})
-            </button>
-            <button
-              onClick={() => setFilter('prioritize')}
-              className={`px-3 py-1.5 rounded-lg text-sm ${filter === 'prioritize' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}`}
-            >
-              🔥 Prioritizovat ({matches.filter(m => m.recommendation === 'prioritize').length})
-            </button>
-            <button
-              onClick={() => setFilter('normal')}
-              className={`px-3 py-1.5 rounded-lg text-sm ${filter === 'normal' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
-            >
-              📋 Normální ({matches.filter(m => m.recommendation === 'normal').length})
-            </button>
-            <button
-              onClick={() => setFilter('skip')}
-              className={`px-3 py-1.5 rounded-lg text-sm ${filter === 'skip' ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300'}`}
-            >
-              ⚠️ Přeskočit ({matches.filter(m => m.recommendation === 'skip').length})
-            </button>
+          {/* Table Controls (Glow Filter Bar) */}
+          <div className="flex flex-wrap items-center gap-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 shadow-inner">
+             <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-4 mr-2">Filtr Segmentu:</span>
+             {[
+               { id: 'all', label: 'VŠECHNO', count: stats?.totalMatches || 0, color: 'sky' },
+               { id: 'prioritize', label: '🔥 PRIORITNÍ', count: stats?.prioritizeCount || 0, color: 'emerald' },
+               { id: 'normal', label: '📋 NORMÁLNÍ', count: stats?.normalCount || 0, color: 'blue' },
+               { id: 'skip', label: '⚠️ IGNOROVAT', count: stats?.skipCount || 0, color: 'rose' },
+             ].map((btn) => (
+                <button
+                  key={btn.id}
+                  onClick={() => setFilter(btn.id as any)}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all ${
+                    filter === btn.id 
+                    ? `bg-${btn.color}-600/30 text-${btn.color}-400 ring-1 ring-${btn.color}-600/50 shadow-lg` 
+                    : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {btn.label} <span className="opacity-40 tabular-nums">({btn.count})</span>
+                </button>
+             ))}
           </div>
 
-          {/* Matches Table */}
-          <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-900 border-b border-slate-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Priorita
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Nabídka
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Poptávka
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Zisk
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Skóre
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Vypočítáno
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700">
-                  {filteredMatches.map((match) => (
-                    <tr
-                      key={match.matchKey}
-                      className={`hover:bg-slate-700 hover:bg-opacity-30 transition-colors cursor-pointer ${
-                        match.recommendation === 'prioritize' ? 'bg-emerald-900 bg-opacity-10' :
-                        match.recommendation === 'skip' ? 'bg-red-900 bg-opacity-10' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRecommendationColor(match.recommendation)} text-white`}>
-                          {match.recommendation === 'prioritize' ? '🔥' : match.recommendation === 'skip' ? '⚠️' : '📋'}
-                          {match.recommendation === 'prioritize' ? 'Prioritizovat' : match.recommendation === 'skip' ? 'Přeskočit' : 'Normální'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-slate-200 font-medium">{match.offer.title}</div>
-                        <div className="text-xs text-slate-400">{match.offer.price}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-slate-200">{match.demand.title}</div>
-                        <div className="text-xs text-slate-400">{match.demand.price}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-bold text-emerald-400">
-                          {match.arbitrageScore.toLocaleString()} Kč
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className={`text-lg font-bold ${getScoreColor(match.overallScore)}`}>
-                          {match.overallScore}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-xs text-slate-400">
-                          {new Date(match.calculatedAt).toLocaleString('cs-CZ', {
-                            day: 'numeric',
-                            month: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredMatches.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
-                {filter === 'all' ? 'Žádné obchody k zobrazení' : `Žádné obchody s filtrem "${filter}"`}
-              </div>
-            )}
-          </div>
+          <PriorityMatchTable 
+            matches={filteredMatches} 
+            getRecommendationColor={getRecommendationColor} 
+            getScoreColor={getScoreColor} 
+          />
         </div>
       )}
 
-      {activeTab === 'capacity' && <UserCapacityPanel />}
-      {activeTab === 'accuracy' && <HistoricalAccuracyPanel />}
-      {activeTab === 'auto' && <AutoPrioritizationPanel />}
-      {activeTab === 'trends' && <RealMarketTrendsPanel />}
+      {/* Panels for other tabs (placeholder support) */}
+      <div className="animate-in fade-in duration-500">
+        {activeTab === 'capacity' && <UserCapacityPanel />}
+        {activeTab === 'accuracy' && <HistoricalAccuracyPanel />}
+        {activeTab === 'auto' && <AutoPrioritizationPanel />}
+        {activeTab === 'trends' && <RealMarketTrendsPanel />}
+      </div>
+
     </div>
   );
 };
