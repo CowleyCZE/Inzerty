@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run --pool=forks --no-file-parallelism",
+    "test:watch": "vitest --pool=forks --no-file-parallelism",
+    "test:coverage": "vitest run --coverage --pool=forks --no-file-parallelism",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "test:integration": "tsx src/integration.test.ts"

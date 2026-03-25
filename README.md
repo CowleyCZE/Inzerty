@@ -18,6 +18,21 @@ Webová aplikace pro **scrapování, ukládání a porovnávání inzerátů** m
 - **Denní report** stavu (nové/kontaktováno/uzavřeno)
 - **Alerty** na TOP příležitosti (Telegram, Email, Discord)
 
+### ✅ Autonomní AI Vyjednávání
+
+- AI analyzuje sentiment obdržených zpráv a extrahuje nabídky.
+- Automatické generování optimálních protinávrhů podle situace na trhu (Recommendation Engine).
+
+### ✅ Fraud Detection & Bezpečnost
+
+- Skórování rizika podvodu pomocí AI (15+ detekovaných varovných signálů).
+- Automatické spravování Watchlistu podezřelých prodejců na základě rizikového skóre.
+
+### ✅ Plánovač schůzek a Kalendář
+
+- AI návrhy nejbezpečnějších míst k předání podle lokality inzerátu.
+- Systém automatických upomínek a přímý iCal export plánovaných událostí.
+
 ### ✅ Inkrementální scraping
 
 - Scraper automaticky ukládá checkpointy (`brand + ad_type`)

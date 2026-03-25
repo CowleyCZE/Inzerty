@@ -8,6 +8,11 @@ a projekt dodržuje [Semantic Versioning](https://semver.org/lang/cs/).
 ## [Nevydané]
 
 ### Přidáno
+- Zatím nic nového.
+
+## [1.1.0] - 2026-03-25
+
+### Přidáno
 - **🌍 Multi-Platform Scraping - Fáze 1: Základní architektura** ✅
   - **Nové typy a interface** (`types.ts`):
     - `AdSource` - Typ pro všechny podporované platformy (bazos_cz, bazos_sk, sbazar, mobilnet, aukro, atd.)
@@ -60,7 +65,6 @@ a projekt dodržuje [Semantic Versioning](https://semver.org/lang/cs/).
     - 📋 **hyperinzerce** - Plánováno
     - 📋 **annonce** - Plánováno
 
-### Přidáno (pokračování)
 - **Partially Implemented Features - Dokončení** ✅
   - **Email Notifications** - Kompletní implementace
     - UI pro nastavení SMTP (host, port, user, pass, SSL)

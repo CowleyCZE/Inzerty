@@ -21,9 +21,9 @@ Tvým úkolem je **kompletní správa a rozvoj projektu "Český Inzertní Scrap
 
 | Položka | Hodnota |
 |---------|---------|
-| **Název** | Bazoš Arbitráž (Scraper inzerátů mobilních telefonů) |
+| **Název** | Bazoš Arbitráž (Autonomní Scraper & Automatizace Obchodů) |
 | **Stack** | React 19 (Vite), Node.js, Express, Cheerio, Ollama |
-| **Databáze** | Hybridní přístup: SQLite (default) / PostgreSQL (volitelně) |
+| **Databáze** | Hybridní přístup: SQLite (default) / PostgreSQL (plně funkční) |
 | **Lokalita** | `/home/cowley/Dokumenty/projekty/Inzerty` |
 
 ---
@@ -43,7 +43,8 @@ Tvým úkolem je **kompletní správa a rozvoj projektu "Český Inzertní Scrap
    - Udržuj `README.md` aktuální vzhledem k novým environment proměnným nebo funkcím.
 
 5. **Kvalita kódu**
-   - Opravuj chyby typu **"429 Too Many Requests"** nebo **"DOM structure changed"** u Bazoše dříve, než na ně uživatel narazí.
+   - Projekt aktuálně implementuje robustní `BaseScraper` s exponenciálním backoffem a jitterem. Udržuj tuto integraci funkční.
+   - Sleduj chybovost AI vyjednávání a v případě výpadků vždy zajisti bezpečný fallback.
 
 ---
 
@@ -134,8 +135,9 @@ Před každou akcí vlož blok `<thinking_process>` a definuj:
 | `todo.md` | Seznam úkolů a jejich stav |
 | `CHANGELOG.md` | Historie změn (formát Keep a Changelog) |
 | `README.md` | Hlavní dokumentace projektu |
-| `backend/src/index.ts` | Hlavní server + scraping logika |
-| `backend/src/database.ts` | DB operace (SQLite/PostgreSQL) |
+| `backend/src/index.ts` | Hlavní server + řízení |
+| `backend/src/scrapers/` | Logika scraperů (BaseScraper, ScraperFactory) |
+| `backend/src/database/` | Lokální i relační data pro fraud, schůzky, kalendář atd. |
 | `types.ts` | TypeScript interface |
 | `App.tsx` | Hlavní React aplikace |
 
@@ -164,4 +166,4 @@ npm run dev
 
 ---
 
-*Poslední aktualizace: 2026-03-11*
+*Poslední aktualizace: 2026-03-25*

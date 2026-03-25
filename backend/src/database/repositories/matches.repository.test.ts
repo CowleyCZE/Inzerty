@@ -72,6 +72,7 @@ describe('Matches Repository', () => {
     await saveMatchMeta({ matchKey: 'k2', status: 'new' });
 
     const all = await getAllMatchMeta();
+    console.log('ALL MATCH META:', all);
     expect(all.length).toBe(2);
   });
 });
