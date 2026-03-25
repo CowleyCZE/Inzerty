@@ -1,0 +1,259 @@
+cowley@cowley-15Wg-Plus:~/Dokumenty/projekty/Inzerty/backend$ npm start
+
+> backend@1.0.0 start
+> tsx src/index.ts
+
+[5:07:45] Databáze inicializována.
+🚀 WebSocket server running on port 3002
+[5:07:45] WebSocket server připraven na portu 3002
+[5:07:45] 🚀 REST API běží na http://localhost:3001
+[5:07:45] 📡 WebSockets běží na ws://localhost:3002
+[5:08:38] Nastavení scrapování: stopOnKnownAd=true, maxAdsPerTypePerBrand=50
+[5:08:38] Scrapuji inzeráty pro Apple
+[5:08:38]   Scrapuji nabídky pro Apple
+[5:08:38] Spouštím scrapování pro Apple (nabidka) na https://mobil.bazos.cz/apple/
+[5:08:38] Scrapuji stránku: https://mobil.bazos.cz/apple/
+[5:08:39] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:39] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:39]   Scrapuji poptávky pro Apple
+[5:08:39]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:39] Spouštím scrapování pro Apple (poptavka) na https://mobil.bazos.cz/apple/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:39] Scrapuji stránku: https://mobil.bazos.cz/apple/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:39] Scrapuji stránku: https://mobil.bazos.cz/apple/20/?hledat=koupim&hlokalita=&humkreis=25&cenaod=&cenado=&order=
+[5:08:39] Scrapuji stránku: https://mobil.bazos.cz/apple/40/?hledat=koupim&hlokalita=&humkreis=25&cenaod=&cenado=&order=
+[5:08:39] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:39] Úspěšně načteno 46 inzerátů (46 nových v DB).
+[5:08:39]     Nalezeno 46 poptávek pro "koupím"
+[5:08:39]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:39] Spouštím scrapování pro Apple (poptavka) na https://mobil.bazos.cz/apple/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:39] Scrapuji stránku: https://mobil.bazos.cz/apple/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:39] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:39] Úspěšně načteno 8 inzerátů (8 nových v DB).
+[5:08:39]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:39] Spouštím scrapování pro Apple (poptavka) na https://mobil.bazos.cz/apple/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:39] Scrapuji stránku: https://mobil.bazos.cz/apple/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:39] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:39] Úspěšně načteno 5 inzerátů (5 nových v DB).
+[5:08:39]     Vyřazeno 4 nabídek z výsledků poptávek (špatný typ)
+[5:08:39]   Výsledek pro Apple: Nabídky=0 (uloženo: 0), Poptávky=42 (uloženo: 59)
+[5:08:39] Scrapuji inzeráty pro Samsung
+[5:08:39]   Scrapuji nabídky pro Samsung
+[5:08:39] Spouštím scrapování pro Samsung (nabidka) na https://mobil.bazos.cz/samsung/
+[5:08:39] Scrapuji stránku: https://mobil.bazos.cz/samsung/
+[5:08:39] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:39] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:39]   Scrapuji poptávky pro Samsung
+[5:08:39]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:39] Spouštím scrapování pro Samsung (poptavka) na https://mobil.bazos.cz/samsung/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:39] Scrapuji stránku: https://mobil.bazos.cz/samsung/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/samsung/20/?hledat=koupim&hlokalita=&humkreis=25&cenaod=&cenado=&order=
+[5:08:40] Nalezen inzerát starší než 2 měsíce (- [24.1. 2026]). Ukončuji.
+[5:08:40] Úspěšně načteno 27 inzerátů (27 nových v DB).
+[5:08:40]     Nalezeno 27 poptávek pro "koupím"
+[5:08:40]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:40] Spouštím scrapování pro Samsung (poptavka) na https://mobil.bazos.cz/samsung/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/samsung/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:40] Úspěšně načteno 4 inzerátů (4 nových v DB).
+[5:08:40]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:40] Spouštím scrapování pro Samsung (poptavka) na https://mobil.bazos.cz/samsung/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/samsung/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:40] Úspěšně načteno 1 inzerátů (1 nových v DB).
+[5:08:40]     Vyřazeno 2 nabídek z výsledků poptávek (špatný typ)
+[5:08:40]   Výsledek pro Samsung: Nabídky=0 (uloženo: 0), Poptávky=25 (uloženo: 32)
+[5:08:40] Scrapuji inzeráty pro Google
+[5:08:40]   Scrapuji nabídky pro Google
+[5:08:40] Spouštím scrapování pro Google (nabidka) na https://mobil.bazos.cz/google/
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/google/
+[5:08:40] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:40] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:40]   Scrapuji poptávky pro Google
+[5:08:40]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:40] Spouštím scrapování pro Google (poptavka) na https://mobil.bazos.cz/google/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/google/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:40] Úspěšně načteno 4 inzerátů (4 nových v DB).
+[5:08:40]     Nalezeno 4 poptávek pro "koupím"
+[5:08:40]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:40] Spouštím scrapování pro Google (poptavka) na https://mobil.bazos.cz/google/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/google/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:40] Úspěšně načteno 1 inzerátů (1 nových v DB).
+[5:08:40]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:40] Spouštím scrapování pro Google (poptavka) na https://mobil.bazos.cz/google/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/google/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:40] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:40]   Výsledek pro Google: Nabídky=0 (uloženo: 0), Poptávky=4 (uloženo: 5)
+[5:08:40] Scrapuji inzeráty pro Huawei
+[5:08:40]   Scrapuji nabídky pro Huawei
+[5:08:40] Spouštím scrapování pro Huawei (nabidka) na https://mobil.bazos.cz/huawei/
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/huawei/
+[5:08:40] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:40] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:40]   Scrapuji poptávky pro Huawei
+[5:08:40]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:40] Spouštím scrapování pro Huawei (poptavka) na https://mobil.bazos.cz/huawei/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/huawei/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:40] Úspěšně načteno 2 inzerátů (2 nových v DB).
+[5:08:40]     Nalezeno 2 poptávek pro "koupím"
+[5:08:40]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:40] Spouštím scrapování pro Huawei (poptavka) na https://mobil.bazos.cz/huawei/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/huawei/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:40] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:40]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:40] Spouštím scrapování pro Huawei (poptavka) na https://mobil.bazos.cz/huawei/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:40] Scrapuji stránku: https://mobil.bazos.cz/huawei/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:41] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:41]   Výsledek pro Huawei: Nabídky=0 (uloženo: 0), Poptávky=2 (uloženo: 2)
+[5:08:41] Scrapuji inzeráty pro Motorola
+[5:08:41]   Scrapuji nabídky pro Motorola
+[5:08:41] Spouštím scrapování pro Motorola (nabidka) na https://mobil.bazos.cz/motorola/
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/motorola/
+[5:08:41] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:41] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:41]   Scrapuji poptávky pro Motorola
+[5:08:41]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:41] Spouštím scrapování pro Motorola (poptavka) na https://mobil.bazos.cz/motorola/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/motorola/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:41] Úspěšně načteno 3 inzerátů (3 nových v DB).
+[5:08:41]     Nalezeno 3 poptávek pro "koupím"
+[5:08:41]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:41] Spouštím scrapování pro Motorola (poptavka) na https://mobil.bazos.cz/motorola/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/motorola/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:41] Úspěšně načteno 2 inzerátů (2 nových v DB).
+[5:08:41]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:41] Spouštím scrapování pro Motorola (poptavka) na https://mobil.bazos.cz/motorola/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/motorola/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:41] Úspěšně načteno 1 inzerátů (1 nových v DB).
+[5:08:41]   Výsledek pro Motorola: Nabídky=0 (uloženo: 0), Poptávky=3 (uloženo: 6)
+[5:08:41] Scrapuji inzeráty pro Nokia
+[5:08:41]   Scrapuji nabídky pro Nokia
+[5:08:41] Spouštím scrapování pro Nokia (nabidka) na https://mobil.bazos.cz/nokia/
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/nokia/
+[5:08:41] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:41] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:41]   Scrapuji poptávky pro Nokia
+[5:08:41]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:41] Spouštím scrapování pro Nokia (poptavka) na https://mobil.bazos.cz/nokia/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/nokia/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Nalezen inzerát starší než 2 měsíce (- [24.1. 2026]). Ukončuji.
+[5:08:41] Úspěšně načteno 7 inzerátů (7 nových v DB).
+[5:08:41]     Nalezeno 7 poptávek pro "koupím"
+[5:08:41]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:41] Spouštím scrapování pro Nokia (poptavka) na https://mobil.bazos.cz/nokia/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/nokia/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:41] Úspěšně načteno 2 inzerátů (2 nových v DB).
+[5:08:41]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:41] Spouštím scrapování pro Nokia (poptavka) na https://mobil.bazos.cz/nokia/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/nokia/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:41] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:41]   Výsledek pro Nokia: Nabídky=0 (uloženo: 0), Poptávky=7 (uloženo: 9)
+[5:08:41] Scrapuji inzeráty pro Realme
+[5:08:41]   Scrapuji nabídky pro Realme
+[5:08:41] Spouštím scrapování pro Realme (nabidka) na https://mobil.bazos.cz/realme/
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/realme/
+[5:08:41] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:41] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:41]   Scrapuji poptávky pro Realme
+[5:08:41]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:41] Spouštím scrapování pro Realme (poptavka) na https://mobil.bazos.cz/realme/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/realme/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:41] Úspěšně načteno 1 inzerátů (1 nových v DB).
+[5:08:41]     Nalezeno 1 poptávek pro "koupím"
+[5:08:41]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:41] Spouštím scrapování pro Realme (poptavka) na https://mobil.bazos.cz/realme/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/realme/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:41] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:41]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:41] Spouštím scrapování pro Realme (poptavka) na https://mobil.bazos.cz/realme/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/realme/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:41] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:41] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:41]   Výsledek pro Realme: Nabídky=0 (uloženo: 0), Poptávky=1 (uloženo: 1)
+[5:08:41] Scrapuji inzeráty pro Sony
+[5:08:41]   Scrapuji nabídky pro Sony
+[5:08:41] Spouštím scrapování pro Sony (nabidka) na https://mobil.bazos.cz/ericsson/
+[5:08:41] Scrapuji stránku: https://mobil.bazos.cz/ericsson/
+[5:08:42] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- [25.3. 2026]). Inkrementální scraping končí.
+[5:08:42] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:42]   Scrapuji poptávky pro Sony
+[5:08:42]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:42] Spouštím scrapování pro Sony (poptavka) na https://mobil.bazos.cz/ericsson/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/ericsson/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:42] Úspěšně načteno 1 inzerátů (1 nových v DB).
+[5:08:42]     Nalezeno 1 poptávek pro "koupím"
+[5:08:42]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:42] Spouštím scrapování pro Sony (poptavka) na https://mobil.bazos.cz/ericsson/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/ericsson/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:42] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:42]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:42] Spouštím scrapování pro Sony (poptavka) na https://mobil.bazos.cz/ericsson/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/ericsson/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:42] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:42]   Výsledek pro Sony: Nabídky=0 (uloženo: 0), Poptávky=1 (uloženo: 1)
+[5:08:42] Scrapuji inzeráty pro Xiaomi
+[5:08:42]   Scrapuji nabídky pro Xiaomi
+[5:08:42] Spouštím scrapování pro Xiaomi (nabidka) na https://mobil.bazos.cz/xiaomi/
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/xiaomi/
+[5:08:42] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:42] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:42]   Scrapuji poptávky pro Xiaomi
+[5:08:42]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:42] Spouštím scrapování pro Xiaomi (poptavka) na https://mobil.bazos.cz/xiaomi/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/xiaomi/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:42] Úspěšně načteno 7 inzerátů (7 nových v DB).
+[5:08:42]     Nalezeno 7 poptávek pro "koupím"
+[5:08:42]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:42] Spouštím scrapování pro Xiaomi (poptavka) na https://mobil.bazos.cz/xiaomi/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/xiaomi/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Na stránce nebyly nalezeny žádné inzeráty. Ukončuji.
+[5:08:42] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:42]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:42] Spouštím scrapování pro Xiaomi (poptavka) na https://mobil.bazos.cz/xiaomi/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/xiaomi/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:42] Úspěšně načteno 2 inzerátů (2 nových v DB).
+[5:08:42]   Výsledek pro Xiaomi: Nabídky=0 (uloženo: 0), Poptávky=7 (uloženo: 9)
+[5:08:42] Scrapuji inzeráty pro Ostatní
+[5:08:42]   Scrapuji nabídky pro Ostatní
+[5:08:42] Spouštím scrapování pro Ostatní (nabidka) na https://mobil.bazos.cz/mobily/
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/mobily/
+[5:08:42] Narazili jsme na inzerát starší nebo stejný jako checkpoint (- TOP - [25.3. 2026]). Inkrementální scraping končí.
+[5:08:42] Úspěšně načteno 0 inzerátů (0 nových v DB).
+[5:08:42]   Scrapuji poptávky pro Ostatní
+[5:08:42]     Hledám poptávky s klíčovým slovem: "koupím"
+[5:08:42] Spouštím scrapování pro Ostatní (poptavka) na https://mobil.bazos.cz/mobily/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/mobily/?hledat=koupim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:42] Úspěšně načteno 20 inzerátů (20 nových v DB).
+[5:08:42]     Nalezeno 20 poptávek pro "koupím"
+[5:08:42]     Hledám poptávky s klíčovým slovem: "sháním"
+[5:08:42] Spouštím scrapování pro Ostatní (poptavka) na https://mobil.bazos.cz/mobily/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/mobily/?hledat=shanim&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:42] Úspěšně načteno 1 inzerátů (1 nových v DB).
+[5:08:42]     Hledám poptávky s klíčovým slovem: "hledám"
+[5:08:42] Spouštím scrapování pro Ostatní (poptavka) na https://mobil.bazos.cz/mobily/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Scrapuji stránku: https://mobil.bazos.cz/mobily/?hledat=hledam&rubriky=mobil&hlokalita=&humkreis=25&cenaod=&cenado=&Submit=Hledat&order=&crp=&kitx=ano
+[5:08:42] Nebyl nalezen odkaz na další stránku. Ukončuji.
+[5:08:42] Úspěšně načteno 3 inzerátů (3 nových v DB).
+[5:08:42]   Výsledek pro Ostatní: Nabídky=0 (uloženo: 0), Poptávky=20 (uloženo: 24)
+[5:09:04] Porovnávání spuštěno.
+[5:09:05] Načtená data pro porovnání: nabídky=511, poptávky=124
+[5:09:05] Zpracovávám 511 inzerátů pomocí AI (z toho 0 nových modelů a 495 embeddingů)...

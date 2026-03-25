@@ -260,11 +260,13 @@ export const scrapeUrl = async (
           price: $(element).find(selectors.price).text().trim(),
           link: fullLink,
           date_posted: adDateStr,
+          posted_at: adDate ? adDate.toISOString() : undefined, // ISO formát pro Postgres TIMESTAMPTZ
           brand: extractedBrand,  // Použít extrahovanou značku
           ad_type: finalAdType,
           scraped_at: new Date().toISOString(),
           description: adDescription,
           location: $(element).find(selectors.location).text().trim(),
+          image_url: $(element).find(selectors.image).attr('src') || '', // Přidáno pro úplnost
         };
 
         try {
@@ -467,6 +469,17 @@ const parseDate = (dateStr: string): Date | null => {
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     return yesterday;
+  }
+
+  // Pro formát Bazos: "[25.1. 2026]" nebo "- [25.1. 2026]" nebo "25.1. 2026"
+  const dateMatch = str.match(/(\d+)\.(\d+)\.\s*(\d{4})/);
+  if (dateMatch?.[1] && dateMatch?.[2] && dateMatch?.[3]) {
+    const day = parseInt(dateMatch[1], 10);
+    const month = parseInt(dateMatch[2], 10) - 1; // 0-indexed month
+    const year = parseInt(dateMatch[3], 10);
+    
+    // Nastavit čas na půlnoc, abychom se vyhnuli problémům s časovými pásmy během dne
+    return new Date(year, month, day, 12, 0, 0);
   }
 
   if (str.includes('před')) {

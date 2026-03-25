@@ -54,6 +54,8 @@ export interface MatchingSummary {
   useAI: boolean;
 }
 
+let isMatchingActive = false;
+
 /**
  * Hlavní matching orchestrace
  */
@@ -64,226 +66,235 @@ export const findMatches = async (
   data: MatchResult[];
   summary: MatchingSummary;
 }> => {
-  const foundMatches: MatchResult[] = [];
-  pushRuntimeLog('Porovnávání spuštěno.', 'system');
-  const seenMatches = new Set<string>();
-
-  const comparisonMethod = options.comparisonMethod || 'auto';
-  const filterRules = options.filterRules || {};
-  const hideResolved = options.hideResolved !== false;
-  const resolvedMatchKeys = hideResolved ? new Set(await getResolvedMatchKeys()) : new Set<string>();
-
-  // Zjistit zda použít AI
-  let useAI = false;
-  if (comparisonMethod === 'ollama') {
-    useAI = await ollamaManager.checkStatus();
-  } else if (comparisonMethod === 'auto') {
-    useAI = await ollamaManager.checkStatus();
+  if (isMatchingActive) {
+    throw new Error('Porovnávání již probíhá. Prosím počkejte na dokončení.');
   }
 
-  const allOffers = await getAllAdsByType('nabidka');
-  const allDemands = await getAllAdsByType('poptavka');
+  try {
+    isMatchingActive = true;
+    const foundMatches: MatchResult[] = [];
+    pushRuntimeLog('Porovnávání spuštěno.', 'system');
+    const seenMatches = new Set<string>();
 
-  pushRuntimeLog(
-    `Načtená data pro porovnání: nabídky=${allOffers.length}, poptávky=${allDemands.length}`,
-    'system'
-  );
+    const comparisonMethod = options.comparisonMethod || 'auto';
+    const filterRules = options.filterRules || {};
+    const hideResolved = options.hideResolved !== false;
+    const resolvedMatchKeys = hideResolved ? new Set(await getResolvedMatchKeys()) : new Set<string>();
 
-  if (allOffers.length === 0 || allDemands.length === 0) {
-    return {
-      message: 'Porovnání dokončeno! V databázi není dostatek dat pro porovnání.',
-      data: [],
-      summary: {
-        totalMatches: 0,
-        message: 'Nedostatek dat',
-        useAI: false,
-      },
-    };
-  }
-
-  // Obohatit data o AI embeddingy
-  const enrichedOffers = useAI
-    ? await enrichWithAI(allOffers)
-    : allOffers;
-  const enrichedDemands = useAI
-    ? await enrichWithAI(allDemands)
-    : allDemands;
-
-  const useDatabaseVectorSearch = useAI && usingPostgres() && isPgVectorAvailable();
-
-  // Porovnání
-  let processedDemands = 0;
-  for (const demandAd of enrichedDemands) {
-    processedDemands += 1;
-    if (processedDemands % 50 === 0) {
-      pushRuntimeLog(
-        `Průběh porovnání: zpracováno ${processedDemands}/${enrichedDemands.length} poptávek, shod=${foundMatches.length}`,
-        'system'
-      );
+    // Zjistit zda použít AI
+    let useAI = false;
+    if (comparisonMethod === 'ollama') {
+      useAI = await ollamaManager.checkStatus();
+    } else if (comparisonMethod === 'auto') {
+      useAI = await ollamaManager.checkStatus();
     }
 
-    const demandPrice = parsePrice(demandAd.price);
-    if (demandPrice === null) continue;
+    const allOffers = await getAllAdsByType('nabidka');
+    const allDemands = await getAllAdsByType('poptavka');
 
-    const demandModel = useAI ? demandAd.model_ai || '' : '';
-    const demandStorage = extractStorage(demandAd.title + ' ' + demandAd.description) || 
-                          extractStorage(demandModel);
+    pushRuntimeLog(
+      `Načtená data pro porovnání: nabídky=${allOffers.length}, poptávky=${allDemands.length}`,
+      'system'
+    );
 
-    // Ignorovat poptávky bez specifikovaného modelu
-    if (!demandModel || demandModel.length < 3) continue;
-
-    // Ignorovat obecné poptávky
-    if (['koupím', 'hledám', 'sháním'].includes(demandAd.title.toLowerCase().trim())) continue;
-
-    const pgSimilarityMap = new Map<string, number>();
-
-    if (useDatabaseVectorSearch) {
-      const similarRows = await getPgVectorSimilarities(demandAd.id, 0.75);
-      similarRows.forEach((row: { offer_id: string; similarity: number }) => {
-        pgSimilarityMap.set(row.offer_id, Math.round(row.similarity * 100));
-      });
+    if (allOffers.length === 0 || allDemands.length === 0) {
+      return {
+        message: 'Porovnání dokončeno! V databázi není dostatek dat pro porovnání.',
+        data: [],
+        summary: {
+          totalMatches: 0,
+          message: 'Nedostatek dat',
+          useAI: false,
+        },
+      };
     }
 
-    for (const offerAd of enrichedOffers) {
-      if (demandAd.brand !== offerAd.brand) continue;
-      if (demandAd.url === offerAd.url) continue;
+    // Obohatit data o AI embeddingy
+    const enrichedOffers = useAI
+      ? await enrichWithAI(allOffers)
+      : allOffers;
+    const enrichedDemands = useAI
+      ? await enrichWithAI(allDemands)
+      : allDemands;
 
-      const offerPrice = parsePrice(offerAd.price);
-      if (offerPrice === null) continue;
+    const useDatabaseVectorSearch = useAI && usingPostgres() && isPgVectorAvailable();
 
-      // Cenová logika
-      if (demandPrice <= offerPrice) continue;
-      if (demandPrice > offerPrice * 1.6) continue;
-
-      // Blacklist kontrola
-      const fullText = `${demandAd.title} ${demandAd.description} ${offerAd.title} ${offerAd.description}`.toLowerCase();
-      const blacklistTerms: string[] = Array.isArray(filterRules.blacklistTerms) ? filterRules.blacklistTerms : [];
-      if (blacklistTerms.some(term => term && fullText.includes(String(term).toLowerCase()))) continue;
-
-      // Whitelist kontrola
-      const whitelistModels: string[] = Array.isArray(filterRules.whitelistModels) ? filterRules.whitelistModels : [];
-      if (whitelistModels.length > 0) {
-        const modelText = `${demandAd.title} ${offerAd.title}`.toLowerCase();
-        if (!whitelistModels.some(m => modelText.includes(String(m).toLowerCase()))) continue;
+    // Porovnání
+    let processedDemands = 0;
+    for (const demandAd of enrichedDemands) {
+      processedDemands += 1;
+      if (processedDemands % 50 === 0) {
+        pushRuntimeLog(
+          `Průběh porovnání: zpracováno ${processedDemands}/${enrichedDemands.length} poptávek, shod=${foundMatches.length}`,
+          'system'
+        );
       }
 
-      // Cenové filtry
-      const minPrice = typeof filterRules.minPrice === 'number' ? filterRules.minPrice : null;
-      const maxPrice = typeof filterRules.maxPrice === 'number' ? filterRules.maxPrice : null;
-      if (minPrice !== null && offerPrice < minPrice) continue;
-      if (maxPrice !== null && offerPrice > maxPrice) continue;
+      const demandPrice = parsePrice(demandAd.price);
+      if (demandPrice === null) continue;
 
-      // Úložiště
-      const offerStorage = extractStorage(offerAd.title + ' ' + offerAd.description) || 
-                          extractStorage(offerAd.model_ai || '');
-      if (demandStorage && offerStorage && demandStorage !== offerStorage) continue;
+      const demandModel = useAI ? demandAd.model_ai || '' : '';
+      const demandStorage = extractStorage(demandAd.title + ' ' + demandAd.description) || 
+                            extractStorage(demandModel);
 
-      // Tablet vs telefon kontrola
-      const offerModel = useAI ? offerAd.model_ai || '' : '';
-      const demandIsTablet = demandModel.toLowerCase().includes('ipad') || demandModel.toLowerCase().includes('tablet');
-      const offerIsTablet = offerModel.toLowerCase().includes('ipad') || offerModel.toLowerCase().includes('tablet');
-      if (demandIsTablet !== offerIsTablet) continue;
+      // Ignorovat poptávky bez specifikovaného modelu
+      if (!demandModel || demandModel.length < 3) continue;
 
-      // Matching logika
-      let isMatch = false;
-      let similarityScore = 0;
+      // Ignorovat obecné poptávky
+      if (['koupím', 'hledám', 'sháním'].includes(demandAd.title.toLowerCase().trim())) continue;
 
-      if (useAI) {
-        const dbSimilarity = pgSimilarityMap.get(offerAd.id);
+      const pgSimilarityMap = new Map<string, number>();
 
-        if (typeof dbSimilarity === 'number') {
-          similarityScore = dbSimilarity;
-          const modelMatch = checkModelMatch(demandModel, offerModel);
-          isMatch = similarityScore >= 85 && modelMatch;
-        } else if (demandAd.parsed_embedding && offerAd.parsed_embedding) {
-          const sim = cosineSimilarity(demandAd.parsed_embedding, offerAd.parsed_embedding);
-          similarityScore = Math.round(sim * 100);
-          const modelMatch = checkModelMatch(demandModel, offerModel);
-          isMatch = similarityScore >= 85 && modelMatch;
+      if (useDatabaseVectorSearch) {
+        const similarRows = await getPgVectorSimilarities(demandAd.id, 0.75);
+        similarRows.forEach((row: { offer_id: string; similarity: number }) => {
+          pgSimilarityMap.set(row.offer_id, Math.round(row.similarity * 100));
+        });
+      }
 
-          if (modelMatch && similarityScore < 100) {
-            similarityScore = Math.min(100, similarityScore + 15);
+      for (const offerAd of enrichedOffers) {
+        if (demandAd.brand !== offerAd.brand) continue;
+        if (demandAd.url === offerAd.url) continue;
+
+        const offerPrice = parsePrice(offerAd.price);
+        if (offerPrice === null) continue;
+
+        // Cenová logika
+        if (demandPrice <= offerPrice) continue;
+        if (demandPrice > offerPrice * 1.6) continue;
+
+        // Blacklist kontrola
+        const fullText = `${demandAd.title} ${demandAd.description} ${offerAd.title} ${offerAd.description}`.toLowerCase();
+        const blacklistTerms: string[] = Array.isArray(filterRules.blacklistTerms) ? filterRules.blacklistTerms : [];
+        if (blacklistTerms.some(term => term && fullText.includes(String(term).toLowerCase()))) continue;
+
+        // Whitelist kontrola
+        const whitelistModels: string[] = Array.isArray(filterRules.whitelistModels) ? filterRules.whitelistModels : [];
+        if (whitelistModels.length > 0) {
+          const modelText = `${demandAd.title} ${offerAd.title}`.toLowerCase();
+          if (!whitelistModels.some(m => modelText.includes(String(m).toLowerCase()))) continue;
+        }
+
+        // Cenové filtry
+        const minPrice = typeof filterRules.minPrice === 'number' ? filterRules.minPrice : null;
+        const maxPrice = typeof filterRules.maxPrice === 'number' ? filterRules.maxPrice : null;
+        if (minPrice !== null && offerPrice < minPrice) continue;
+        if (maxPrice !== null && offerPrice > maxPrice) continue;
+
+        // Úložiště
+        const offerStorage = extractStorage(offerAd.title + ' ' + offerAd.description) || 
+                            extractStorage(offerAd.model_ai || '');
+        if (demandStorage && offerStorage && demandStorage !== offerStorage) continue;
+
+        // Tablet vs telefon kontrola
+        const offerModel = useAI ? offerAd.model_ai || '' : '';
+        const demandIsTablet = demandModel.toLowerCase().includes('ipad') || demandModel.toLowerCase().includes('tablet');
+        const offerIsTablet = offerModel.toLowerCase().includes('ipad') || offerModel.toLowerCase().includes('tablet');
+        if (demandIsTablet !== offerIsTablet) continue;
+
+        // Matching logika
+        let isMatch = false;
+        let similarityScore = 0;
+
+        if (useAI) {
+          const dbSimilarity = pgSimilarityMap.get(offerAd.id);
+
+          if (typeof dbSimilarity === 'number') {
+            similarityScore = dbSimilarity;
+            const modelMatch = checkModelMatch(demandModel, offerModel);
+            isMatch = similarityScore >= 85 && modelMatch;
+          } else if (demandAd.parsed_embedding && offerAd.parsed_embedding) {
+            const sim = cosineSimilarity(demandAd.parsed_embedding, offerAd.parsed_embedding);
+            similarityScore = Math.round(sim * 100);
+            const modelMatch = checkModelMatch(demandModel, offerModel);
+            isMatch = similarityScore >= 85 && modelMatch;
+
+            if (modelMatch && similarityScore < 100) {
+              similarityScore = Math.min(100, similarityScore + 15);
+            }
+          } else {
+            const modelMatch = checkModelMatch(demandModel, offerModel);
+            isMatch = modelMatch;
+            similarityScore = isMatch ? 100 : 0;
           }
         } else {
-          const modelMatch = checkModelMatch(demandModel, offerModel);
-          isMatch = modelMatch;
-          similarityScore = isMatch ? 100 : 0;
+          // Bez AI - keyword matching
+          similarityScore = getSimilarity(demandAd.title, offerAd.title);
+          isMatch = similarityScore >= 0.65;
+          similarityScore = Math.round(similarityScore * 100);
         }
-      } else {
-        // Bez AI - keyword matching
-        similarityScore = getSimilarity(demandAd.title, offerAd.title);
-        isMatch = similarityScore >= 0.65;
-        similarityScore = Math.round(similarityScore * 100);
-      }
 
-      if (isMatch) {
-        const dedupKey = `${offerAd.url || offerAd.id}__${demandAd.url || demandAd.id}`;
-        if (seenMatches.has(dedupKey)) continue;
-        seenMatches.add(dedupKey);
+        if (isMatch) {
+          const dedupKey = `${offerAd.url || offerAd.id}__${demandAd.url || demandAd.id}`;
+          if (seenMatches.has(dedupKey)) continue;
+          seenMatches.add(dedupKey);
 
-        const arbitrageScore = demandPrice - offerPrice;
-        const opportunityScore = computeOpportunityScore(
-          arbitrageScore,
-          similarityScore,
-          demandAd.date_posted || '',
-          offerAd.date_posted || ''
-        );
-        const locScore = locationSimilarity(demandAd.location || '', offerAd.location || '');
-        const baseline = median(offerPricesByBrand[demandAd.brand] || []);
-        const trustScore = priceTrustScore(offerPrice, baseline);
-        const realOpportunityScore = computeRealOpportunityScore(
-          arbitrageScore,
-          demandPrice,
-          offerPrice,
-          similarityScore,
-          demandAd.date_posted || '',
-          offerAd.date_posted || '',
-          locScore,
-          trustScore
-        );
+          const arbitrageScore = demandPrice - offerPrice;
+          const opportunityScore = computeOpportunityScore(
+            arbitrageScore,
+            similarityScore,
+            demandAd.date_posted || '',
+            offerAd.date_posted || ''
+          );
+          const locScore = locationSimilarity(demandAd.location || '', offerAd.location || '');
+          const baseline = median(offerPricesByBrand[demandAd.brand] || []);
+          const trustScore = priceTrustScore(offerPrice, baseline);
+          const realOpportunityScore = computeRealOpportunityScore(
+            arbitrageScore,
+            demandPrice,
+            offerPrice,
+            similarityScore,
+            demandAd.date_posted || '',
+            offerAd.date_posted || '',
+            locScore,
+            trustScore
+          );
 
-        if (resolvedMatchKeys.has(dedupKey)) continue;
+          if (resolvedMatchKeys.has(dedupKey)) continue;
 
-        const matchObj: MatchResult = {
-          offer: { ...offerAd, similarity: similarityScore, ai: useAI },
-          demand: demandAd,
-          arbitrageScore,
-          opportunityScore,
-          realOpportunityScore,
-          expectedNetProfit: Math.max(0, Math.round(arbitrageScore - 400)),
-          locationScore: locScore,
-          priceTrustScore: trustScore,
-          similarityScore,
-        };
+          const matchObj: MatchResult = {
+            offer: { ...offerAd, similarity: similarityScore, ai: useAI },
+            demand: demandAd,
+            arbitrageScore,
+            opportunityScore,
+            realOpportunityScore,
+            expectedNetProfit: Math.max(0, Math.round(arbitrageScore - 400)),
+            locationScore: locScore,
+            priceTrustScore: trustScore,
+            similarityScore,
+          };
 
-        foundMatches.push(matchObj);
-        await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
+          foundMatches.push(matchObj);
+          await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
 
-        // Inicializovat deal state
-        await initDealState(dedupKey);
+          // Inicializovat deal state
+          await initDealState(dedupKey);
+        }
       }
     }
+
+    // Seřazení výsledků
+    foundMatches.sort(
+      (a, b) => (b.realOpportunityScore - a.realOpportunityScore) || (b.arbitrageScore - a.arbitrageScore)
+    );
+
+    pushRuntimeLog(
+      `Porovnání dokončeno. Nalezeno ${foundMatches.length} shod.`,
+      foundMatches.length > 0 ? 'success' : 'system'
+    );
+
+    return {
+      message: `Porovnání dokončeno! Nalezeno ${foundMatches.length} shod. ${useAI ? '(AI embeddingy)' : '(Klíčová slova)'}`,
+      data: foundMatches,
+      summary: {
+        totalMatches: foundMatches.length,
+        message: useAI ? 'AI embedding matching' : 'Keyword matching',
+        useAI,
+      },
+    };
+  } finally {
+    isMatchingActive = false;
   }
-
-  // Seřazení výsledků
-  foundMatches.sort(
-    (a, b) => (b.realOpportunityScore - a.realOpportunityScore) || (b.arbitrageScore - a.arbitrageScore)
-  );
-
-  pushRuntimeLog(
-    `Porovnání dokončeno. Nalezeno ${foundMatches.length} shod.`,
-    foundMatches.length > 0 ? 'success' : 'system'
-  );
-
-  return {
-    message: `Porovnání dokončeno! Nalezeno ${foundMatches.length} shod. ${useAI ? '(AI embeddingy)' : '(Klíčová slova)'}`,
-    data: foundMatches,
-    summary: {
-      totalMatches: foundMatches.length,
-      message: useAI ? 'AI embedding matching' : 'Keyword matching',
-      useAI,
-    },
-  };
 };
 
 // ========================================
@@ -292,10 +303,22 @@ export const findMatches = async (
 
 const enrichWithAI = async (ads: any[]): Promise<any[]> => {
   const enriched: any[] = [];
+  const needingModel = ads.filter(a => !a.model_ai).length;
+  const needingEmbedding = ads.filter(a => !a.embedding).length;
   
-  pushRuntimeLog('Zpracovávám inzeráty pomocí AI...', 'system');
+  pushRuntimeLog(`Zpracovávám ${ads.length} inzerátů pomocí AI (z toho ${needingModel} nových modelů a ${needingEmbedding} embeddingů)...`, 'system');
   
+  let processed = 0;
   for (const ad of ads) {
+    processed++;
+    if (!ad.model_ai || !ad.embedding) {
+      if (processed % 5 === 0 || processed === 1) {
+         pushRuntimeLog(`Postup AI zpracování: ${processed}/${ads.length} inzerátů (probíhá Ollama)...`, 'system');
+      }
+    } else if (processed % 50 === 0) {
+      pushRuntimeLog(`Skenováno: ${processed}/${ads.length} inzerátů (zpracováno v DB)...`, 'system');
+    }
+
     const model = ad.model_ai || await extractModelWithAI(ad.title, ad.description);
     if (model && !ad.model_ai) {
       await updateAdModelAi(ad.id, model);
@@ -339,8 +362,12 @@ Model:`;
         model: ollamaModel,
         prompt: prompt,
         stream: false,
+        options: {
+          num_ctx: 2048,
+          temperature: 0.1,
+        },
       },
-      { timeout: 10000 }
+      { timeout: 90000 }
     );
 
     const result = response.data.response.trim();
@@ -392,8 +419,11 @@ const getEmbeddingFromOllama = async (text: string): Promise<number[] | null> =>
       {
         model: ollamaModel,
         prompt: text,
+        options: {
+          num_ctx: 2048,
+        },
       },
-      { timeout: 15000 }
+      { timeout: 120000 }
     );
 
     const embedding = response.data.embedding || null;

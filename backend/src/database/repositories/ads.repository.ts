@@ -36,7 +36,25 @@ export const saveAd = async (ad: AdInput): Promise<boolean> => {
 
   const source = ad.source || 'bazos_cz';
   const externalId = ad.external_id || ad.id;
-  const postedAt = ad.posted_at || ad.date_posted;
+  
+  // Zvýšená opatrnost pro PostgreSQL TIMESTAMPTZ
+  // Pokud posted_at není platné datum, použijeme scraped_at jako fallback pro Postgres
+  let postedAt: string;
+  const adPostedAt = (ad as any).posted_at;
+  
+  if (adPostedAt && !isNaN(Date.parse(adPostedAt))) {
+    postedAt = new Date(adPostedAt).toISOString();
+  } else if (ad.date_posted && !isNaN(Date.parse(ad.date_posted))) {
+    postedAt = new Date(ad.date_posted).toISOString();
+  } else {
+    postedAt = ad.scraped_at || new Date().toISOString();
+  }
+
+  // Zajistit že i scraped_at je validní
+  const scrapedAt = ad.scraped_at && !isNaN(Date.parse(ad.scraped_at)) 
+    ? new Date(ad.scraped_at).toISOString() 
+    : new Date().toISOString();
+
   const sellerInfo = ad.seller ? JSON.stringify(ad.seller) : null;
   const metadata = ad.metadata ? JSON.stringify(ad.metadata) : null;
 
@@ -45,7 +63,7 @@ export const saveAd = async (ad: AdInput): Promise<boolean> => {
     const result = await pool.query(
       `INSERT INTO ads (id, title, price, price_value, location, description, date_posted, url, image_url, ad_type, brand, scraped_at, model_ai, embedding, source, external_id, posted_at, seller_info, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-       ON CONFLICT (url, ad_type) DO UPDATE SET
+       ON CONFLICT (id) DO UPDATE SET
          source = EXCLUDED.source,
          seller_info = EXCLUDED.seller_info,
          metadata = EXCLUDED.metadata,
@@ -63,7 +81,7 @@ export const saveAd = async (ad: AdInput): Promise<boolean> => {
         ad.image_url || '',
         ad.ad_type,
         ad.brand,
-        ad.scraped_at,
+        scrapedAt,
         '',
         null,
         source,
@@ -92,7 +110,7 @@ export const saveAd = async (ad: AdInput): Promise<boolean> => {
       ad.image_url || '',
       ad.ad_type,
       ad.brand,
-      ad.scraped_at,
+      scrapedAt,
       '',
       null,
       source,

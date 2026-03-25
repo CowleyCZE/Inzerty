@@ -86,8 +86,12 @@ Model:`;
         model: ollamaModel,
         prompt: prompt,
         stream: false,
+        options: {
+          num_ctx: 2048,
+          temperature: 0.1,
+        },
       },
-      { timeout: 10000 }
+      { timeout: 30000 }
     );
 
     const result = response.data.response.trim();
@@ -152,8 +156,11 @@ export const getEmbeddingFromOllama = async (text: string): Promise<number[] | n
       {
         model: ollamaModel,
         prompt: text,
+        options: {
+          num_ctx: 2048,
+        },
       },
-      { timeout: 15000 }
+      { timeout: 30000 }
     );
 
     const embedding = response.data.embedding || null;
@@ -231,8 +238,12 @@ Formát odpovědi JSON:
         model: ollamaModel,
         prompt: prompt,
         stream: false,
+        options: {
+          num_ctx: 2048,
+          temperature: 0.7,
+        },
       },
-      { timeout: 20000 }
+      { timeout: 60000 }
     );
 
     const rawText = response.data.response.trim();
@@ -350,8 +361,12 @@ Formát odpovědi JSON:
         model: ollamaModel,
         prompt: prompt,
         stream: false,
+        options: {
+          num_ctx: 2048,
+          temperature: 0.1,
+        },
       },
-      { timeout: 20000 }
+      { timeout: 45000 }
     );
 
     const rawText = response.data.response.trim();
@@ -415,8 +430,12 @@ Formát odpovědi JSON:
         model: ollamaModel,
         prompt: prompt,
         stream: false,
+        options: {
+          num_ctx: 2048,
+          temperature: 0.2,
+        },
       },
-      { timeout: 20000 }
+      { timeout: 45000 }
     );
 
     const rawText = response.data.response.trim();
@@ -533,8 +552,12 @@ Formát odpovědi JSON:
         model: ollamaModel,
         prompt: prompt,
         stream: false,
+        options: {
+          num_ctx: 2048,
+          temperature: 0.1,
+        },
       },
-      { timeout: 20000 }
+      { timeout: 45000 }
     );
 
     const rawText = response.data.response.trim();

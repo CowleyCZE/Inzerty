@@ -7,6 +7,7 @@ Webová aplikace pro **scrapování, ukládání a porovnávání inzerátů** m
 ## 📋 Funkce aplikace
 
 ### ✅ Akční fronta (Kanban) + metadata
+
 - **Status pipeline**: `Nové` → `Prověřit` → `Kontaktováno` → `Vyjednávání` → `Uzavřeno`
 - **Priority**: `Nízká`, `Střední`, `Vysoká`, `Kritická`
 - **Poznámky** ke každému zápasu
@@ -18,28 +19,33 @@ Webová aplikace pro **scrapování, ukládání a porovnávání inzerátů** m
 - **Alerty** na TOP příležitosti (Telegram, Email, Discord)
 
 ### ✅ Inkrementální scraping
+
 - Scraper automaticky ukládá checkpointy (`brand + ad_type`)
 - Při dalším běhu stahuje jen nové inzeráty
 - Umí se zastavit na posledním známém URL a/nebo datu
 - Omezuje zbytečné requesty při častém spouštění
 
 ### ✅ Spolehlivější scraping
+
 - Rotace `User-Agent` headers
 - Náhodné zpoždění mezi požadavky
 - Retry logika + exponenciální backoff + jitter pro chyby (`429/5xx/408` a síťové chyby)
 - Volitelná **proxy rotace** přes `SCRAPER_PROXY_URLS`
 
 ### ✅ Porovnání inzerátů (AI / bez AI)
+
 - **Lokální keyword režim** – základní textové porovnání
 - **AI režim** – využívá Ollama (`llama3.2:1b`) s embeddingy pro pokročilé porovnání
 - **Auto režim** – automaticky se přepíná podle dostupnosti Ollama
 
 ### ✅ Arbitrážní skóre
+
 - Backend počítá `arbitrageScore = demandPrice - offerPrice`
 - Frontend umí filtrovat minimální zisk
 - Řazení výsledků podle výnosnosti
 
 ### ✅ Škálování přes PostgreSQL + pgvector
+
 - **Výchozí režim:** SQLite (bezstarostné spuštění bez konfigurace)
 - **Volitelně:** PostgreSQL s pgvector pro výpočty podobnosti přímo v databázi
 - `DB_CLIENT=postgres` + `DATABASE_URL` pro přepnutí
@@ -104,11 +110,27 @@ npm start
 # V rootu projektu
 npm run dev
 # Aplikace běží na http://localhost:5173
+
 ```
 
-Po spuštění obou komponent:
 - Backend API: `http://localhost:3001`
 - Frontend UI: `http://localhost:5173`
+
+### Spuštění testů
+
+Aplikace obsahuje automatizované testy pro backend i frontend.
+
+```bash
+# Spuštění všech testů najednou (z rootu projektu)
+npm test
+
+# Sledování změn v testech (watch mode)
+cd backend && npm run test:watch
+
+# Generování reportu pokrytí kódu (coverage)
+# (vyžaduje dříve spuštěnou instalaci backend závislostí)
+npm run test:coverage
+```
 
 ---
 
@@ -125,7 +147,9 @@ inzerty-stop
 ```
 
 Skript automaticky zastaví:
+
 - ✅ Frontend (Vite dev server, port 5173)
+
 - ✅ Backend (Node.js server, port 3001)
 - ✅ Ollama (AI server, port 11434)
 
@@ -165,36 +189,51 @@ Pokud chcete používat PostgreSQL místo SQLite:
 #### Instalace PostgreSQL (Linux/macOS)
 
 **macOS (Homebrew):**
+
 ```bash
 brew install postgresql
 brew services start postgresql
 ```
 
 **Ubuntu/Debian:**
+
 ```bash
-sudo apt-get install postgresql postgresql-contrib
+# Instalace postgreSQL (verze 16 odpovídá Ubuntu 24.04)
+sudo apt-get install postgresql postgresql-contrib postgresql-16-pgvector
 sudo systemctl start postgresql
 ```
 
 **Windows:**
+
 - Stáhněte z [postgresql.org](https://www.postgresql.org/download/windows/)
 - Spusťte instalátor
 
-#### Vytvoření databáze
+#### Vytvoření databáze a uživatele
+
+Nejjednodušší způsob je použít utilitu `psql` (interactive terminal).
 
 ```bash
-# Přihlášení do PostgreSQL
+# Přihlášení jako superuživatel postgres (Linux)
+sudo -u postgres psql
+
+# NEBO přihlášení pod vaším uživatelem (pokud máte práva)
 psql -U postgres
 
-# V PostgreSQL terminálu:
+# V PostgreSQL terminálu (postupně zadejte příkazy):
 CREATE DATABASE inzerty;
-CREATE USER inzerty_user WITH PASSWORD 'tvoje_hesla';
-ALTER ROLE inzerty_user SET client_encoding TO 'utf8';
-ALTER ROLE inzerty_user SET default_transaction_isolation TO 'read committed';
-ALTER ROLE inzerty_user SET default_transaction_deferrable TO on;
+CREATE USER inzerty_user WITH PASSWORD 'tvoje_heslo';
 GRANT ALL PRIVILEGES ON DATABASE inzerty TO inzerty_user;
+
+# Pokud používáte novější PostgreSQL (15+), je potřeba povolit schéma pro uživatele:
+\c inzerty
+GRANT ALL ON SCHEMA public TO inzerty_user;
+
+# Ukončení psql
 \q
 ```
+
+> [!TIP]
+> Tabulky se vytvoří automaticky při prvním spuštění backendu díky funkci `initDb()`. Není potřeba manuálně spouštět SQL skripty.
 
 #### Konfigurace v .env
 
@@ -211,16 +250,24 @@ DATABASE_URL="postgresql://inzerty_user:tvoje_hesla@localhost:5432/inzerty"
 
 #### Instalace pgvector (pokročilé)
 
-```bash
-# V PostgreSQL terminálu
-psql -U postgres -d inzerty
+Extension `vector` musí být povolena v konkrétní databázi.
 
-# Vytvoření extension
+```bash
+# Pokud jste stále v psql, přepněte se do databáze 'inzerty':
+\c inzerty
+
+# Pokud jste v shellu (terminálu), připojte se přímo k databáze:
+# psql -U postgres -d inzerty
+
+# Následně spusťte SQL příkaz pro aktivaci:
 CREATE EXTENSION IF NOT EXISTS vector;
-\q
+
+# Ověření:
+SELECT * FROM pg_extension WHERE extname = 'vector';
 ```
 
 Pak v `backend/.env` aktivujte:
+
 ```bash
 ENABLE_PGVECTOR=true
 ```
@@ -234,6 +281,7 @@ Pokud chcete používat AI pro inteligentní porovnání inzerátů:
 #### Instalace Ollama
 
 **macOS / Windows / Linux:**
+
 - Stáhněte z [ollama.ai](https://ollama.ai)
 - Spusťte instalátor
 
@@ -247,7 +295,7 @@ ollama serve
 # Běží na http://localhost:11434
 ```
 
-#### Konfigurace v .env
+#### Konfigurace v .en
 
 ```bash
 # V backend/.env
@@ -273,7 +321,7 @@ curl http://localhost:11434/api/tags
 
 Pokud chcete rotovat proxy servery pro scraping:
 
-#### Konfigurace v .env
+### Konfigurace v .e
 
 ```bash
 # Backend/.env
@@ -340,6 +388,7 @@ PORT=3001
 ## 🔧 Řešení problémů
 
 ### Backend se nespustí
+
 ```bash
 # Ověřte, že Node.js je nainstalován
 node -v
@@ -350,6 +399,7 @@ npm install
 ```
 
 ### PostgreSQL nejedná
+
 ```bash
 # Ověřte, zda PostgreSQL běží
 sudo systemctl status postgresql
@@ -359,6 +409,7 @@ psql -U postgres -d inzerty
 ```
 
 ### Ollama se nespojuje
+
 ```bash
 # Ověřte, zda Ollama běží
 curl http://localhost:11434/api/tags
@@ -368,6 +419,7 @@ ollama serve
 ```
 
 ### Proxy nefungují
+
 ```bash
 # Otestujte proxy bez aplikace
 curl -x http://proxy:8080 https://www.google.com
@@ -381,6 +433,7 @@ SCRAPER_PROXY_URLS=http://proxy1:8080,http://proxy2:8080
 ## 📌 Poznámky
 
 ⚠️ **Důležité:** Scrapování cizích webů provádějte ohleduplně:
+
 - Respektujte `robots.txt` a terms of service
 - Používejte rozumnou frekvenci (nespamujte server)
 - Zvažte dopad na provoz cílového webu

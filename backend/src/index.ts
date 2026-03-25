@@ -2,6 +2,7 @@
  * Český Inzertní Scraper UI - Backend Entry Point
  */
 
+import 'dotenv/config';
 import app from './app.js';
 import { initDb } from './database.js';
 import { wsService } from './websocket.js';

@@ -23,8 +23,25 @@ export const useSettingsForm = ({ config, onSave, onClearDatabase }: UseSettings
 
   useEffect(() => {
     setDraft(config);
+    
+    // Load persisted settings
     const savedSignature = localStorage.getItem('inzerty_signature_v1');
     if (savedSignature) setSignature(savedSignature);
+
+    const savedUsePostgres = localStorage.getItem('inzerty_use_postgres');
+    if (savedUsePostgres !== null) setUsePostgres(savedUsePostgres === 'true');
+
+    const savedPostgresUrl = localStorage.getItem('inzerty_postgres_url');
+    if (savedPostgresUrl) setPostgresUrl(savedPostgresUrl);
+
+    const savedOllamaUrl = localStorage.getItem('inzerty_ollama_url');
+    if (savedOllamaUrl) setOllamaUrl(savedOllamaUrl);
+
+    const savedUseProxy = localStorage.getItem('inzerty_use_proxy');
+    if (savedUseProxy !== null) setUseProxy(savedUseProxy === 'true');
+
+    const savedProxyPool = localStorage.getItem('inzerty_proxy_pool');
+    if (savedProxyPool) setProxyPool(savedProxyPool);
   }, [config]);
 
   const handleSave = async () => {
@@ -32,7 +49,15 @@ export const useSettingsForm = ({ config, onSave, onClearDatabase }: UseSettings
     setStatusMessage('');
     try {
       await onSave(draft);
+      
+      // Persist settings
       localStorage.setItem('inzerty_signature_v1', signature);
+      localStorage.setItem('inzerty_use_postgres', String(usePostgres));
+      localStorage.setItem('inzerty_postgres_url', postgresUrl);
+      localStorage.setItem('inzerty_ollama_url', ollamaUrl);
+      localStorage.setItem('inzerty_use_proxy', String(useProxy));
+      localStorage.setItem('inzerty_proxy_pool', proxyPool);
+      
       setStatusMessage('🎯 Nastavení bylo úspěšně uloženo.');
       setTimeout(() => setStatusMessage(''), 3000);
     } catch (error) {
