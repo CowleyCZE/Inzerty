@@ -6,6 +6,7 @@ import * as database from '../database.js';
 vi.mock('../database.js', () => ({
   getAllAdsByType: vi.fn(),
   saveMatch: vi.fn(),
+  saveMatchMeta: vi.fn(),
   initDealState: vi.fn(),
   getResolvedMatchKeys: vi.fn(() => []),
   updateAdModelAi: vi.fn(),

@@ -24,6 +24,7 @@ export const POSTGRES_SCHEMA = `
     scraped_at TIMESTAMPTZ,
     model_ai TEXT,
     embedding TEXT,
+    embedding_dim INTEGER,
     source TEXT DEFAULT 'bazos_cz',
     external_id TEXT,
     posted_at TIMESTAMPTZ,
@@ -402,6 +403,7 @@ export const SQLITE_SCHEMA = `
     scraped_at TEXT,
     model_ai TEXT,
     embedding TEXT,
+    embedding_dim INTEGER,
     source TEXT DEFAULT 'bazos_cz',
     external_id TEXT,
     posted_at TEXT,
@@ -764,6 +766,7 @@ export const SQLITE_SCHEMA = `
 export const POSTGRES_COLUMN_MIGRATIONS = [
   'ALTER TABLE ads ADD COLUMN IF NOT EXISTS model_ai TEXT',
   'ALTER TABLE ads ADD COLUMN IF NOT EXISTS embedding TEXT',
+  'ALTER TABLE ads ADD COLUMN IF NOT EXISTS embedding_dim INTEGER',
   'ALTER TABLE ads ADD COLUMN IF NOT EXISTS price_value DOUBLE PRECISION',
   'ALTER TABLE ads ADD COLUMN IF NOT EXISTS location TEXT',
   'ALTER TABLE ads ADD COLUMN IF NOT EXISTS description TEXT',
@@ -787,6 +790,7 @@ export interface SqliteColumnMigration {
 export const SQLITE_COLUMN_MIGRATIONS: SqliteColumnMigration[] = [
   { name: 'model_ai', ddl: 'model_ai TEXT' },
   { name: 'embedding', ddl: 'embedding TEXT' },
+  { name: 'embedding_dim', ddl: 'embedding_dim INTEGER' },
   { name: 'price_value', ddl: 'price_value REAL' },
   { name: 'location', ddl: 'location TEXT' },
   { name: 'description', ddl: 'description TEXT' },

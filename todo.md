@@ -1,5 +1,12 @@
 # TODO.md — Seznam úkolů pro Bazoš Arbitráž
 
+## 🔄 Aktuální úkoly
+
+### Právě pracuji
+| Úkol | Popis | Priorita | Stav |
+|------|-------|----------|------|
+| **Oprava chyb** | Oprava "different vector dimensions 384 and 2048" | Kritická | ✅ **Dokončeno** |
+
 ## 📋 Stav implementace funkcí
 
 ### ✅ Dokončené funkce

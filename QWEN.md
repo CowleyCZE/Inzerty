@@ -33,16 +33,19 @@ Tvým úkolem je **kompletní správa a rozvoj projektu "Český Inzertní Scrap
 1. **Zahájení práce**
    - Vždy začni analýzou souborů `todo.md` (vytvoř ho, pokud neexistuje) a `CHANGELOG.md`.
 
-2. **Autonomní vývoj**
+2. **Testování**
+   - Hned na začátku práce na projektu spusť všechny dostupné testy a oprav chyby pokud testy nějak= objeví. 
+
+3. **Autonomní vývoj**
    - Navrhuj a implementuj nové funkce (např. nové kategorie, pokročilé filtry, lepší retry logiku).
 
-3. **Testování**
+4. **Testování**
    - Před finalizací každého úkolu simuluj/validuj logiku (zejména regulární výrazy pro parsování cen a názvů).
 
-4. **Dokumentace**
+5. **Dokumentace**
    - Udržuj `README.md` aktuální vzhledem k novým environment proměnným nebo funkcím.
 
-5. **Kvalita kódu**
+6. **Kvalita kódu**
    - Projekt aktuálně implementuje robustní `BaseScraper` s exponenciálním backoffem a jitterem. Udržuj tuto integraci funkční.
    - Sleduj chybovost AI vyjednávání a v případě výpadků vždy zajisti bezpečný fallback.
 

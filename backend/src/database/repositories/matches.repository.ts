@@ -105,18 +105,51 @@ export const getPgVectorSimilarities = async (demandAdId: string, threshold = 0.
   if (!usingPostgres()) return [];
 
   const pool = getPgPool();
+  
+  // Nejprve získáme rozměr embeddingu pro demand ad
+  const demandDimResult = await pool.query(
+    'SELECT embedding_dim FROM ads WHERE id = $1 AND embedding IS NOT NULL',
+    [demandAdId]
+  );
+  
+  if (demandDimResult.rows.length === 0) {
+    return []; // Demand nemá embedding
+  }
+  
+  const demandDim = demandDimResult.rows[0]?.embedding_dim;
+  
+  // Pokud nemáme rozměr, zkusíme odvodit z délky embeddingu
+  if (!demandDim) {
+    const embeddingResult = await pool.query(
+      'SELECT embedding FROM ads WHERE id = $1',
+      [demandAdId]
+    );
+    if (embeddingResult.rows.length > 0 && embeddingResult.rows[0]?.embedding) {
+      try {
+        const embedding = JSON.parse(embeddingResult.rows[0].embedding);
+        if (Array.isArray(embedding)) {
+          return []; // Nemůžeme porovnávat bez správného vector typu
+        }
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+  
   const res = await pool.query(
     `SELECT offer.id AS offer_id,
-            1 - (offer.embedding_vector <=> demand.embedding_vector) AS similarity
+            1 - (offer.embedding::vector <=> demand.embedding::vector) AS similarity
      FROM ads AS demand
      JOIN ads AS offer ON offer.brand = demand.brand
+       AND offer.embedding_dim = demand.embedding_dim  -- Stejný rozměr vektorů
      WHERE demand.id = $1
-       AND demand.embedding_vector IS NOT NULL
-       AND offer.embedding_vector IS NOT NULL
+       AND demand.embedding IS NOT NULL
+       AND offer.embedding IS NOT NULL
        AND demand.ad_type = 'poptavka'
        AND offer.ad_type = 'nabidka'
        AND offer.url <> demand.url
-       AND (1 - (offer.embedding_vector <=> demand.embedding_vector)) >= $2
+       AND (1 - (offer.embedding::vector <=> demand.embedding::vector)) >= $2
      ORDER BY similarity DESC
      LIMIT 100`,
     [demandAdId, threshold],

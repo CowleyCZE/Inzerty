@@ -1,11 +1,11 @@
 /**
  * Database Initialization
- * 
+ *
  * Creates database tables and runs initial setup
  */
 
 import { getSqliteDb, getPgPool, usingPostgres } from './connection.js';
-import { POSTGRES_SCHEMA, SQLITE_SCHEMA } from './schema.js';
+import { POSTGRES_SCHEMA, SQLITE_SCHEMA, POSTGRES_COLUMN_MIGRATIONS, SQLITE_COLUMN_MIGRATIONS } from './schema.js';
 
 let isInitialized = false;
 let pgVectorReady = false;
@@ -18,10 +18,22 @@ export const initDb = async (): Promise<void> => {
 
   if (usingPostgres()) {
     const pool = getPgPool();
-    
+
     // Execute PostgreSQL schema
     await pool.query(POSTGRES_SCHEMA);
-    
+
+    // Apply column migrations
+    for (const migration of POSTGRES_COLUMN_MIGRATIONS) {
+      try {
+        await pool.query(migration);
+      } catch (error: any) {
+        // Ignore "already exists" errors
+        if (!error.message.includes('already exists')) {
+          console.error('Migration error:', error.message.substring(0, 100));
+        }
+      }
+    }
+
     // Check if pgvector is available
     try {
       await pool.query('SELECT * FROM pg_extension WHERE extname = \'vector\'');
@@ -31,14 +43,14 @@ export const initDb = async (): Promise<void> => {
     }
   } else {
     const db = await getSqliteDb();
-    
+
     // Simple approach: execute each line that contains CREATE TABLE or CREATE INDEX
     const lines = SQLITE_SCHEMA.split('\n');
     let currentStatement = '';
-    
+
     for (const line of lines) {
       currentStatement += line + '\n';
-      
+
       // If line ends with semicolon, execute the statement
       if (line.trim().endsWith(';')) {
         try {
@@ -50,6 +62,21 @@ export const initDb = async (): Promise<void> => {
           }
         }
         currentStatement = '';
+      }
+    }
+
+    // Apply SQLite column migrations
+    const tableName = 'ads';
+    const existingColumns = await db.all<{ name: string }[]>(`PRAGMA table_info(${tableName})`);
+    const existingColumnNames = new Set(existingColumns.map(col => col.name));
+
+    for (const migration of SQLITE_COLUMN_MIGRATIONS) {
+      if (!existingColumnNames.has(migration.name)) {
+        try {
+          await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${migration.ddl}`);
+        } catch (error: any) {
+          console.error('SQLite migration error:', error.message.substring(0, 100));
+        }
       }
     }
   }

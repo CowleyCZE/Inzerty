@@ -7,8 +7,16 @@ a projekt dodržuje [Semantic Versioning](https://semver.org/lang/cs/).
 
 ## [Nevydané]
 
-### Přidáno
-- Zatím nic nového.
+### Opraveno
+- **Tests**: Přidána chybějící `saveMatchMeta` funkce do mocku v `matching.service.test.ts` - oprava selhávajícího testu "matches ad perfectly when demand and offer match".
+
+### Změněno
+- **Embedding Dimension Tracking**: Přidán sloupec `embedding_dim` pro sledování rozměru vektorových embeddingů
+  - Nový sloupec v tabulce `ads` pro PostgreSQL i SQLite
+  - Migrace: `POSTGRES_COLUMN_MIGRATIONS` a `SQLITE_COLUMN_MIGRATIONS` aktualizovány
+  - `updateAdEmbedding()` nyní automaticky ukládá rozměr vektoru
+  - `getPgVectorSimilarities()` filtruje podle rozměru, aby se předešlo chybě "different vector dimensions"
+  - `initDb()` nyní aplikuje column migrace automaticky při startu
 
 ## [1.1.0] - 2026-03-25
 

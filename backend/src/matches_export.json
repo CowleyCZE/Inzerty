@@ -1,5 +1,28 @@
 {
-  "timestamp": "2026-03-25T03:01:13.938Z",
-  "totalMatches": 0,
-  "matches": []
+  "timestamp": "2026-03-25T23:38:40.786Z",
+  "totalMatches": 1,
+  "matches": [
+    {
+      "offer": {
+        "title": "POCO C85 8GB/256GB Black",
+        "price": "2 200 Kč",
+        "location": "Pardubice533 03",
+        "url": "https://mobil.bazos.cz/inzerat/216669425/poco-c85-8gb256gb-black.php",
+        "brand": "Ostatní"
+      },
+      "demand": {
+        "title": "Shanim rozbite iphony",
+        "price": "2 800 Kč",
+        "location": "Karviná736 01",
+        "url": "https://mobil.bazos.cz/inzerat/215950912/shanim-rozbite-iphony.php",
+        "brand": "Ostatní"
+      },
+      "arbitrageScore": 600,
+      "similarityScore": 100,
+      "realOpportunityScore": 48,
+      "expectedNetProfit": 200,
+      "locationScore": 35,
+      "priceTrustScore": 60
+    }
+  ]
 }

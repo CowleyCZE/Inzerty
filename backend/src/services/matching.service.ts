@@ -12,6 +12,7 @@
 import {
   getAllAdsByType,
   saveMatch,
+  saveMatchMeta,
   initDealState,
   getResolvedMatchKeys,
   updateAdModelAi,
@@ -196,6 +197,10 @@ export const findMatches = async (
         let isMatch = false;
         let similarityScore = 0;
 
+        // Title cross-check: reject if titles clearly reference different phone models
+        const titleMatch = titleContainsSamePhone(demandAd.title, offerAd.title);
+        if (!titleMatch) continue;
+
         if (useAI) {
           const dbSimilarity = pgSimilarityMap.get(offerAd.id);
 
@@ -267,6 +272,8 @@ export const findMatches = async (
           foundMatches.push(matchObj);
           await saveMatch(offerAd.id, demandAd.id, similarityScore, useAI);
 
+          // Inicializovat match_meta (FK pro deal_states)
+          await saveMatchMeta({ matchKey: dedupKey });
           // Inicializovat deal state
           await initDealState(dedupKey);
         }
@@ -506,23 +513,99 @@ const checkModelMatch = (demandModel: string, offerModel: string): boolean => {
   const demandNorm = demandModel.toLowerCase().trim();
   const offerNorm = offerModel.toLowerCase().trim();
 
-  if (demandNorm === offerNorm) return true;
+  if (!demandNorm || !offerNorm) return false;
+  if (demandNorm.length < 3 || offerNorm.length < 3) return false;
 
-  if (demandNorm.length > 5 && offerNorm.length > 5) {
-    const demandNoStorage = demandNorm.replace(/\d{2,4}gb/i, '').trim();
-    const offerNoStorage = offerNorm.replace(/\d{2,4}gb/i, '').trim();
+  // Exact match (ignoring storage)
+  const stripStorage = (s: string) => s.replace(/\d{2,4}\s*gb/gi, '').replace(/\d+\s*tb/gi, '').trim();
+  const demandBase = stripStorage(demandNorm);
+  const offerBase = stripStorage(offerNorm);
 
-    const demandSeries = demandNoStorage.match(/[a-z]+\s*\d+[a-z]*/i)?.[0] || '';
-    const offerSeries = offerNoStorage.match(/[a-z]+\s*\d+[a-z]*/i)?.[0] || '';
+  if (demandBase === offerBase) return true;
 
-    if (demandSeries && offerSeries && demandSeries === offerSeries) {
-      const demandSuffix = demandNoStorage.replace(demandSeries, '').trim();
-      const offerSuffix = offerNoStorage.replace(offerSeries, '').trim();
-      return demandSuffix === offerSuffix;
-    }
+  // iPhone specific matching — must match generation number AND suffix (Pro/Max/Plus)
+  const iphonePattern = /iphone\s*(\d+)\s*(pro\s*max|pro|plus|mini)?/i;
+  const demandIphone = demandNorm.match(iphonePattern);
+  const offerIphone = offerNorm.match(iphonePattern);
+  if (demandIphone && offerIphone) {
+    const demandGen = demandIphone[1];
+    const offerGen = offerIphone[1];
+    const demandSuffix = (demandIphone[2] || '').replace(/\s+/g, ' ').trim();
+    const offerSuffix = (offerIphone[2] || '').replace(/\s+/g, ' ').trim();
+    // Generation MUST match exactly (16 ≠ 17)
+    if (demandGen !== offerGen) return false;
+    // Suffix MUST match (Pro ≠ Pro Max)
+    if (demandSuffix !== offerSuffix) return false;
+    return true;
+  }
+  // One is iPhone and other is not → no match
+  if (demandIphone || offerIphone) return false;
+
+  // Samsung Galaxy specific matching
+  const galaxyPattern = /galaxy\s*(s|a|z|note|fold|flip)\s*(\d+)\s*(\+|plus|ultra|fe)?/i;
+  const demandGalaxy = demandNorm.match(galaxyPattern);
+  const offerGalaxy = offerNorm.match(galaxyPattern);
+  if (demandGalaxy && offerGalaxy) {
+    if (demandGalaxy[1]!.toLowerCase() !== offerGalaxy[1]!.toLowerCase()) return false;
+    if (demandGalaxy[2] !== offerGalaxy[2]) return false;
+    const demandSuffix = (demandGalaxy[3] || '').toLowerCase().replace('plus', '+');
+    const offerSuffix = (offerGalaxy[3] || '').toLowerCase().replace('plus', '+');
+    if (demandSuffix !== offerSuffix) return false;
+    return true;
+  }
+  if (demandGalaxy || offerGalaxy) return false;
+
+  // Generic model matching — extract brand+number pattern and compare strictly
+  const genericPattern = /([a-z]+)\s*(\d+)\s*([a-z]*)/i;
+  const demandGeneric = demandBase.match(genericPattern);
+  const offerGeneric = offerBase.match(genericPattern);
+  if (demandGeneric && offerGeneric) {
+    // Name must match
+    if (demandGeneric[1]!.toLowerCase() !== offerGeneric[1]!.toLowerCase()) return false;
+    // Number must match
+    if (demandGeneric[2] !== offerGeneric[2]) return false;
+    // Suffix must match
+    if ((demandGeneric[3] || '').toLowerCase() !== (offerGeneric[3] || '').toLowerCase()) return false;
+    return true;
   }
 
   return false;
+};
+
+/**
+ * Extract phone identity from ad title for cross-checking
+ */
+const titleContainsSamePhone = (demandTitle: string, offerTitle: string): boolean => {
+  const normalize = (t: string) => t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const dt = normalize(demandTitle);
+  const ot = normalize(offerTitle);
+
+  // iPhone: extract generation + suffix
+  const iphoneRe = /iphone\s*(\d+)\s*(pro\s*max|pro|plus|mini)?/i;
+  const dm = dt.match(iphoneRe);
+  const om = ot.match(iphoneRe);
+  if (dm && om) {
+    if (dm[1] !== om[1]) return false;
+    const ds = (dm[2] || '').replace(/\s+/g, ' ').trim();
+    const os = (om[2] || '').replace(/\s+/g, ' ').trim();
+    return ds === os;
+  }
+  if (dm || om) return false; // one mentions iPhone, other doesn't
+
+  // Galaxy
+  const galaxyRe = /galaxy\s*(s|a|z|note|fold|flip)\s*(\d+)\s*(\+|plus|ultra|fe)?/i;
+  const dg = dt.match(galaxyRe);
+  const og = ot.match(galaxyRe);
+  if (dg && og) {
+    if (dg[1]!.toLowerCase() !== og[1]!.toLowerCase()) return false;
+    if (dg[2] !== og[2]) return false;
+    const dSuf = (dg[3] || '').toLowerCase().replace('plus', '+');
+    const oSuf = (og[3] || '').toLowerCase().replace('plus', '+');
+    return dSuf === oSuf;
+  }
+  if (dg || og) return false;
+
+  return true; // For non-iPhone/Galaxy, defer to embedding/model check
 };
 
 // ========================================

@@ -186,7 +186,26 @@ export const updateAdModelAi = async (id: string, model: string): Promise<void> 
 export const updateAdEmbedding = async (id: string, embedding: string): Promise<void> => {
   if (usingPostgres()) {
     const pool = getPgPool();
-    await pool.query('UPDATE ads SET embedding = $1 WHERE id = $2', [embedding, id]);
+    
+    // Získat rozměr vektoru z embeddingu
+    let embeddingDim: number | null = null;
+    try {
+      const embeddingData = JSON.parse(embedding);
+      if (Array.isArray(embeddingData)) {
+        embeddingDim = embeddingData.length;
+      }
+    } catch (e) {
+      console.error('Failed to parse embedding JSON:', e);
+    }
+    
+    if (embeddingDim !== null) {
+      await pool.query(
+        'UPDATE ads SET embedding = $1, embedding_dim = $2 WHERE id = $3',
+        [embedding, embeddingDim, id]
+      );
+    } else {
+      await pool.query('UPDATE ads SET embedding = $1 WHERE id = $2', [embedding, id]);
+    }
     return;
   }
 
