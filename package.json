@@ -8,7 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "scan:incomplete": "node .github/skills/find-incomplete-functions/scan-incomplete.js .",
+    "scan:incomplete:json": "node .github/skills/find-incomplete-functions/scan-incomplete.js . --json",
+    "scan:components": "node .github/skills/find-incomplete-functions/scan-incomplete.js ./components",
+    "scan:backend": "node .github/skills/find-incomplete-functions/scan-incomplete.js ./backend",
+    "gen:templates": "node .github/skills/find-incomplete-functions/generate-implementation.js",
+    "gen:templates:html": "node .github/skills/find-incomplete-functions/scan-incomplete.js . --json > /tmp/incomplete.json && node .github/skills/find-incomplete-functions/generate-implementation.js /tmp/incomplete.json --html incomplete-report.html && echo '✅ Report: incomplete-report.html'",
+    "audit:incomplete": "npm run scan:incomplete && echo '' && node .github/skills/find-incomplete-functions/scan-incomplete.js . --json > /tmp/incomplete.json && node .github/skills/find-incomplete-functions/generate-implementation.js /tmp/incomplete.json"
   },
   "dependencies": {
     "@google/genai": "^1.4.0",

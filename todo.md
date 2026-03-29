@@ -17,8 +17,9 @@
 | - AdSource typy pro všechny platformy | ✅ Hotovo | 2026-03-16 |
 | - Rozšířený Ad interface (source, seller, metadata) | ✅ Hotovo | 2026-03-16 |
 | - BaseScraper abstraktní třída | ✅ Hotovo | 2026-03-16 |
+| - BaseScraper.updateConfig() a getConfig() metody | ✅ Hotovo | 2026-03-30 |
 | - BazosCZScraper reference implementace | ✅ Hotovo | 2026-03-16 |
-| - ScraperFactory pattern | ✅ Hotovo | 2026-03-16 |
+| - ScraperFactory pattern s aktualizací konfigurace | ✅ Hotovo | 2026-03-30 |
 | - Databázové sloupce pro multi-platform | ✅ Hotovo | 2026-03-16 |
 | - UI PlatformSelector komponenta | ✅ Hotovo | 2026-03-16 |
 | **🚀 Autonomous Process - One-Click Automation** | ✅ **Hotovo** | 2026-03-16 |
@@ -115,6 +116,7 @@
 
 ## 📅 Poslední aktualizace
 
+- **2026-03-30**: Přidány metody updateConfig() a getConfig() do BaseScraper, vylepšen ScraperFactory pattern 🔧
 - **2026-03-11**: Všechny požadované funkce (9/9) kompletně implementovány! 🎉
 - **2026-03-11**: Vylepšen Due Diligence Checklist s progress barem a interaktivními boxy
 - **2026-03-11**: Implementován kalendář/reminder pro follow-upy s notifikacemi

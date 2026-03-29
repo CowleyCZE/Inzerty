@@ -26,8 +26,8 @@ export class ScraperFactory {
     if (this.scrapers.has(source)) {
       const existing = this.scrapers.get(source)!;
       if (config) {
-        // Možnost aktualizovat konfiguraci
-        // TODO: Implementovat update config v BaseScraper
+        // Aktualizujeme konfiguraci existující instance
+        existing.updateConfig(config);
       }
       return existing;
     }
@@ -49,7 +49,7 @@ export class ScraperFactory {
       case 'bazos_sk':
         return new BazosSKScraper();
       
-      // TODO: Až budou implementovány:
+      // Pokud budou implementovány další scrapery, přidat je zde:
       // case 'sbazar':
       //   return new SbazarScraper();
       
@@ -66,9 +66,12 @@ export class ScraperFactory {
 
   /**
    * Vrátí všechny dostupné zdroje
+   * Zahrnuje jen ty scrapery, které jsou aktuálně implementovány
    */
   static getAvailableSources(): AdSource[] {
-    return ['bazos_cz', 'bazos_sk']; // TODO: Rozšířit až budou další scrapery
+    return ['bazos_cz', 'bazos_sk'];
+    // Rozšíření je možné po implementaci dalších scraperů:
+    // return ['bazos_cz', 'bazos_sk', 'sbazar', 'mobilnet', 'aukro'];
   }
 
   /**

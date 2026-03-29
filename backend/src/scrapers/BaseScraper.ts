@@ -295,6 +295,20 @@ export abstract class BaseScraper {
   }
 
   /**
+   * Aktualizuje konfiguraci scraperu
+   */
+  updateConfig(config: Partial<ScraperConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+
+  /**
+   * Vrátí aktuální konfiguraci
+   */
+  getConfig(): ScraperConfig {
+    return this.config;
+  }
+
+  /**
    * Vyčistí cache a seen URLs
    */
   clearCache(): void {
