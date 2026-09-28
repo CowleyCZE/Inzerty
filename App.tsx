@@ -7,6 +7,7 @@ import FollowUpCalendar from './components/FollowUpCalendar';
 import ConversationDashboard from './components/ConversationDashboard';
 import AutomationControls from './components/AutomationControls';
 import SettingsPage from './components/SettingsPage';
+import MatchesViewer from './components/MatchesViewer';
 import { DashboardView } from './components/views/DashboardView';
 
 // Hooks
@@ -15,7 +16,7 @@ import { useOllama } from './hooks/useOllama';
 import { useLogs } from './hooks/useLogs';
 import { useScraping } from './hooks/useScraping';
 
-type AppView = 'dashboard' | 'calendar' | 'settings' | 'conversations' | 'automation';
+type AppView = 'dashboard' | 'calendar' | 'settings' | 'conversations' | 'automation' | 'results';
 
 const App = () => {
   const [view, setView] = useState<AppView>('dashboard');
@@ -95,13 +96,16 @@ const App = () => {
           <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-lg transition-all ${view === 'dashboard' ? 'bg-sky-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
             Hlavní stránka
           </button>
+          <button onClick={() => setView('results')} className={`px-4 py-2 rounded-lg transition-all ${view === 'results' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
+            📊 Výsledky
+          </button>
           <button onClick={() => setView('automation')} className={`px-4 py-2 rounded-lg transition-all ${view === 'automation' ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
             🤖 Automation
           </button>
           <button onClick={() => setView('conversations')} className={`px-4 py-2 rounded-lg transition-all ${view === 'conversations' ? 'bg-purple-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
             💬 Konverzace
           </button>
-          <button onClick={() => setView('calendar')} className={`px-4 py-2 rounded-lg transition-all ${view === 'calendar' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
+          <button onClick={() => setView('calendar')} className={`px-4 py-2 rounded-lg transition-all ${view === 'calendar' ? 'bg-yellow-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
             ⏰ Kalendář
           </button>
           <button onClick={() => setView('settings')} className={`px-4 py-2 rounded-lg transition-all ${view === 'settings' ? 'bg-slate-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}>
@@ -124,6 +128,8 @@ const App = () => {
             handleCompareStoredAds={handleCompareStoredAds}
             handleExportMatches={handleExportMatches}
           />
+        ) : view === 'results' ? (
+          <MatchesViewer />
         ) : view === 'automation' ? (
           <AutomationControls />
         ) : view === 'conversations' ? (

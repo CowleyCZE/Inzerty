@@ -157,6 +157,18 @@ export const findMatches = async (
         if (demandAd.brand !== offerAd.brand) continue;
         if (demandAd.url === offerAd.url) continue;
 
+        // ── Blacklist nabídky ────────────────────────────────────────────
+        if (isBlacklistedOffer(offerAd.title)) continue;
+
+        // ── Kategorie produktu musí souhlasit ────────────────────────────
+        const offerCat = getProductCategory(offerAd.title);
+        const demandCat = getProductCategory(demandAd.title);
+        if (offerCat === 'junk' || demandCat === 'junk') continue;
+        // Pokud máme konkrétní kategorii, musí se shodovat
+        if (offerCat !== 'unknown' && demandCat !== 'unknown' && offerCat !== demandCat) continue;
+        // Brand=Ostatní páruje jen pokud mají obě strany stejnou (nebo unknown) kategorii
+        if (demandAd.brand === 'Ostatní' && offerCat !== demandCat && offerCat !== 'unknown' && demandCat !== 'unknown') continue;
+
         const offerPrice = parsePrice(offerAd.price);
         if (offerPrice === null) continue;
 
@@ -164,7 +176,7 @@ export const findMatches = async (
         if (demandPrice <= offerPrice) continue;
         if (demandPrice > offerPrice * 1.6) continue;
 
-        // Blacklist kontrola
+        // Blacklist kontrola (uživatelský seznam)
         const fullText = `${demandAd.title} ${demandAd.description} ${offerAd.title} ${offerAd.description}`.toLowerCase();
         const blacklistTerms: string[] = Array.isArray(filterRules.blacklistTerms) ? filterRules.blacklistTerms : [];
         if (blacklistTerms.some(term => term && fullText.includes(String(term).toLowerCase()))) continue;
@@ -183,7 +195,7 @@ export const findMatches = async (
         if (maxPrice !== null && offerPrice > maxPrice) continue;
 
         // Úložiště
-        const offerStorage = extractStorage(offerAd.title + ' ' + offerAd.description) || 
+        const offerStorage = extractStorage(offerAd.title + ' ' + offerAd.description) ||
                             extractStorage(offerAd.model_ai || '');
         if (demandStorage && offerStorage && demandStorage !== offerStorage) continue;
 
@@ -193,7 +205,7 @@ export const findMatches = async (
         const offerIsTablet = offerModel.toLowerCase().includes('ipad') || offerModel.toLowerCase().includes('tablet');
         if (demandIsTablet !== offerIsTablet) continue;
 
-        // Matching logika
+        // ── Matching logika ──────────────────────────────────────────────
         let isMatch = false;
         let similarityScore = 0;
 
@@ -223,10 +235,11 @@ export const findMatches = async (
             similarityScore = isMatch ? 100 : 0;
           }
         } else {
-          // Bez AI - keyword matching
-          similarityScore = getSimilarity(demandAd.title, offerAd.title);
-          isMatch = similarityScore >= 0.65;
-          similarityScore = Math.round(similarityScore * 100);
+          // Bez AI - Jaccard similarity na tokenech titulků
+          const jaccard = jaccardSimilarity(demandAd.title, offerAd.title);
+          similarityScore = Math.round(jaccard * 100);
+          // Minimální práh: 30 % shoda tokenů
+          isMatch = jaccard >= 0.30;
         }
 
         if (isMatch) {
@@ -241,7 +254,7 @@ export const findMatches = async (
             demandAd.date_posted || '',
             offerAd.date_posted || ''
           );
-          const locScore = locationSimilarity(demandAd.location || '', offerAd.location || '');
+          const locScore = pscLocationScore(demandAd.location || '', offerAd.location || '');
           const baseline = median(offerPricesByBrand[demandAd.brand] || []);
           const trustScore = priceTrustScore(offerPrice, baseline);
           const realOpportunityScore = computeRealOpportunityScore(
@@ -606,6 +619,97 @@ const titleContainsSamePhone = (demandTitle: string, offerTitle: string): boolea
   if (dg || og) return false;
 
   return true; // For non-iPhone/Galaxy, defer to embedding/model check
+};
+
+// ========================================
+// Kategorie produktu
+// ========================================
+
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  phone:       ['iphone', 'samsung a', 'samsung s', 'galaxy a', 'galaxy s', 'pixel', 'xiaomi', 'redmi', 'poco', 'realme', 'oneplus', 'huawei', 'oppo', 'vivo', 'motorola', 'telefon', 'mobil', 'smartphone'],
+  tablet:      ['ipad', 'galaxy tab', 'tab s', 'tablet', 'surface duo', 'surface pro'],
+  watch:       ['watch', 'hodinky', 'galaxy watch', 'apple watch', 'smartwatch', 'band'],
+  accessories: ['airpods', 'sluchátk', 'earpods', 'pouzdro', 'kryt', 'nabíječ', 'kabel', 'adaptér', 'powerbank'],
+  junk:        ['tarif', 'volání', 'sim', 'předplacenou', 'blatník', 'díl', 'splátk', 'na koupi', 'whatsapp', 'barcode'],
+};
+
+const getProductCategory = (title: string): string => {
+  const t = title.toLowerCase();
+  for (const [cat, kws] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (kws.some(kw => t.includes(kw))) return cat;
+  }
+  return 'unknown';
+};
+
+// ========================================
+// Blacklist nabídek
+// ========================================
+
+const OFFER_BLACKLIST_PATTERNS: RegExp[] = [
+  /^\d{9,}/,            // telefonní číslo jako název
+  /tarif/i,
+  /volání/i,
+  /na\s+splátk/i,
+  /blatník/i,
+  /díl\s/i,
+  /^prodám$/i,          // prázdný název
+  /^\s*[\d\W]+\s*$/,   // jen čísla / symboly
+  /whatsapp/i,
+  /\@whatsapp/i,
+];
+
+const isBlacklistedOffer = (title: string): boolean =>
+  OFFER_BLACKLIST_PATTERNS.some(re => re.test(title.trim()));
+
+// ========================================
+// Jaccard similarity na tokenech
+// ========================================
+
+const jaccardSimilarity = (a: string, b: string): number => {
+  const tokenize = (s: string) =>
+    new Set(s.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(t => t.length > 1));
+  const ta = tokenize(a);
+  const tb = tokenize(b);
+  if (ta.size === 0 && tb.size === 0) return 0;
+  const intersection = [...ta].filter(t => tb.has(t)).length;
+  return intersection / (ta.size + tb.size - intersection);
+};
+
+// ========================================
+// PSČ-based location score
+// ========================================
+
+// Mapa PSČ prefix → region číslo (1–14 kraje ČR)
+const PSC_REGION: Record<string, number> = {
+  '1': 1,  // Praha
+  '2': 2,  // Středočeský
+  '3': 3,  // Jihočeský
+  '4': 4,  // Ústecký
+  '5': 5,  // Pardubický + Královehradecký
+  '6': 6,  // Jihomoravský
+  '7': 7,  // Olomoucký
+  '70': 7, '71': 7, '72': 7,
+  '73': 8, '74': 8, '75': 8, // Moravskoslezský
+  '76': 9, '77': 9,          // Zlínský
+  '78': 7, '79': 7,
+  '8': 10, // Moravskoslezský (zbytek)
+};
+
+const extractPsc = (location: string): string | null => {
+  const m = location.match(/(\d{3})\s?\d{2}/);
+  return m ? m[1]! : null;
+};
+
+const pscLocationScore = (loc1: string, loc2: string): number => {
+  const p1 = extractPsc(loc1);
+  const p2 = extractPsc(loc2);
+  if (!p1 || !p2) return locationSimilarity(loc1, loc2);
+  if (p1 === p2) return 100;                           // stejné město
+  const r1 = PSC_REGION[p1.slice(0, 2)] ?? PSC_REGION[p1[0]!] ?? 0;
+  const r2 = PSC_REGION[p2.slice(0, 2)] ?? PSC_REGION[p2[0]!] ?? 0;
+  if (r1 && r2 && r1 === r2) return 75;               // stejný kraj
+  if (r1 && r2 && Math.abs(r1 - r2) === 1) return 50; // sousední kraj
+  return 30;                                           // vzdálené regiony
 };
 
 // ========================================
